@@ -1,0 +1,13 @@
+{application, bunny_farm,
+ [
+  {description, ""},
+  {vsn, "1.0.0"},
+  {modules, [bunny_farm]},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { bunny_farm_app, []}},
+  {env, []}
+ ]}.

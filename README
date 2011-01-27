@@ -1,0 +1,8 @@
+This is a wrapper library for managing AMQP connections. This simplifies the
+declaration and handshake process to make writing publishers and consumers a
+little easier.
+
+
+AUTHOR
+Brian Lee Yung Rowe
+
