@@ -4,7 +4,7 @@
 -export([declare_exchange/2, declare_exchange/3,
   declare_queue/1, declare_queue/2,
   bind/4]).
--export([consume/1, publish/3]).
+-export([consume/1, publish/2, publish/3]).
 
 open() -> open(#bus_handle{}).
 
@@ -56,6 +56,10 @@ consume(#bus_handle{queue=Q, channel=Channel}) ->
   io:format("[bunny_farm] Sending subscription request: ~p~n", [BasicConsume]),
   Tag = amqp_channel:subscribe(Channel, BasicConsume, self()),
   Tag.
+
+publish(Payload, #bus_handle{exchange=X, routing_key=K, channel=Channel}) ->
+  BasicPublish = #'basic.publish'{exchange=X, routing_key=K}, 
+  amqp_channel:cast(Channel, BasicPublish, #amqp_msg{payload=Payload}).
 
 publish(Payload, RoutingKey, #bus_handle{exchange=X, channel=Channel}) ->
   BasicPublish = #'basic.publish'{exchange=X, routing_key=RoutingKey}, 

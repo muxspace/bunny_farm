@@ -2,7 +2,38 @@ This is a wrapper library for managing AMQP connections. This simplifies the
 declaration and handshake process to make writing publishers and consumers a
 little easier.
 
+Publishing to a Topic Exchange
+When publishing to a topic exchange, a queue isn't necessary since messages
+aren't being read. The exchange will manage routing messages to queues once
+they are defined. This makes sending messages fairly simple.
 
-AUTHOR
+  BusHandle = bunny_farm:open(#bus_handle{exchange=X, routing_key=K}),
+  bunny_farm:declare_exchange(<<"topic">>, X, BusHandle),
+  bunny_farm:publish(Message, BusHandle),
+  bunny_farm:close(BusHandle).
+
+
+Consuming Messages from a Topic Exchange
+Subscribing to messages requires a bit more set up but not much. Here we need 
+to declare a queue. While naming the queue is not required, it can be useful
+for managing the queue later on. Both methods are illustrated below.
+
+Named Queue
+  BusHandle = bunny_farm:open(#bus_handle{exchange=X, queue=Q}),
+  bunny_farm:declare_exchange(<<"topic">>, BusHandle),
+  bunny_farm:declare_queue(Q, BusHandle),
+  bunny_farm:bind(X,Q,K, BusHandle),
+  bunny_farm:consume(BusHandle).
+
+Auto-Named Queue
+  BusHandle = bunny_farm:open(#bus_handle{exchange=X}),
+  bunny_farm:declare_exchange(<<"topic">>, BusHandle),
+  Q = bunny_farm:declare_queue(BusHandle),
+  bunny_farm:bind(X,Q,K, BusHandle),
+  bunny_farm:consume(BusHandle).
+
+
+
+Author
 Brian Lee Yung Rowe
 
