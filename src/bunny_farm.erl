@@ -55,9 +55,9 @@ bind(X, Q, BindKey, BusHandle) when is_record(BusHandle,bus_handle) ->
 
 consume(#bus_handle{queue=Q, channel=Channel}) ->
   BasicConsume = #'basic.consume'{queue=Q, no_ack=true},
-  io:format("[bunny_farm] Sending subscription request: ~p~n", [BasicConsume]),
-  Tag = amqp_channel:subscribe(Channel, BasicConsume, self()),
-  Tag.
+  Msg = "[bunny_farm] Sending subscription request: ~p~n",
+  error_logger:info_msg(Msg, [BasicConsume]),
+  amqp_channel:subscribe(Channel, BasicConsume, self()).
 
 publish(Payload, #bus_handle{exchange=X, routing_key=K, channel=Channel}) ->
   BasicPublish = #'basic.publish'{exchange=X, routing_key=K}, 
