@@ -47,9 +47,11 @@ declare_queue(Key, #bus_handle{channel=Channel}) ->
     consumer_count=_ConsumerCount} = amqp_channel:call(Channel, QueueDeclare),
   Q.
 
-bind(X, Q, BindKey, #bus_handle{channel=Channel}) ->
+bind(X, Q, BindKey, BusHandle) when is_record(BusHandle,bus_handle) ->
+  Channel = BusHandle#bus_handle.channel,
   QueueBind = #'queue.bind'{exchange=X, queue=Q, routing_key=BindKey},
-  #'queue.bind_ok'{} = amqp_channel:call(Channel, QueueBind).
+  #'queue.bind_ok'{} = amqp_channel:call(Channel, QueueBind),
+  BusHandle#bus_handle{queue=Q}.
 
 consume(#bus_handle{queue=Q, channel=Channel}) ->
   BasicConsume = #'basic.consume'{queue=Q, no_ack=true},
