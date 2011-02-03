@@ -87,11 +87,20 @@ consume(#bus_handle{queue=Q, channel=Channel}) ->
   error_logger:info_msg(Msg, [BasicConsume]),
   amqp_channel:subscribe(Channel, BasicConsume, self()).
 
-publish(Payload, #bus_handle{exchange=X, routing_key=K, channel=Channel}) ->
-  BasicPublish = #'basic.publish'{exchange=X, routing_key=K}, 
-  amqp_channel:cast(Channel, BasicPublish, #amqp_msg{payload=Payload}).
 
-publish(Payload, RoutingKey, #bus_handle{exchange=X, channel=Channel}) ->
+publish(#message{payload=Payload,props=Props},
+        #bus_handle{exchange=X, routing_key=K, channel=Channel}) ->
+  BasicPublish = #'basic.publish'{exchange=X, routing_key=K}, 
+  amqp_channel:cast(Channel, BasicPublish, #amqp_msg{payload=Payload, props=Props});
+
+publish(Payload, BusHandle) when is_record(BusHandle,bus_handle) ->
+  publish(#message{payload=Payload}, BusHandle).
+
+publish(#message{payload=Payload,props=Props},
+        RoutingKey, #bus_handle{exchange=X, channel=Channel}) ->
   BasicPublish = #'basic.publish'{exchange=X, routing_key=RoutingKey}, 
-  amqp_channel:cast(Channel, BasicPublish, #amqp_msg{payload=Payload}).
+  amqp_channel:cast(Channel, BasicPublish, #amqp_msg{payload=Payload, props=Props});
+
+publish(Payload, RoutingKey, BusHandle) when is_record(BusHandle,bus_handle) ->
+  publish(#message{payload=Payload}, RoutingKey, BusHandle).
 
