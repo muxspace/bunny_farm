@@ -2,7 +2,7 @@
 -include("bunny_farm.hrl").
 -export([open/0, open/1, open/3, close/1]).
 -export([declare_exchange/2, declare_exchange/3,
-  declare_queue/1, declare_queue/2,
+  declare_queue/1, declare_queue/2, declare_queue/3,
   bind/4]).
 -export([consume/1, publish/2, publish/3]).
 
@@ -42,6 +42,14 @@ declare_queue(#bus_handle{channel=Channel}) ->
 
 declare_queue(Key, #bus_handle{channel=Channel}) ->
   QueueDeclare = #'queue.declare'{queue=Key},
+  #'queue.declare_ok'{queue=Q,
+    message_count=_OrderCount,
+    consumer_count=_ConsumerCount} = amqp_channel:call(Channel, QueueDeclare),
+  Q.
+
+%% Exclusive - true | false
+declare_queue(Key, #bus_handle{channel=Channel}, Exclusive) ->
+  QueueDeclare = #'queue.declare'{queue=Key, exclusive=Exclusive},
   #'queue.declare_ok'{queue=Q,
     message_count=_OrderCount,
     consumer_count=_ConsumerCount} = amqp_channel:call(Channel, QueueDeclare),
