@@ -33,27 +33,47 @@ declare_exchange(Type, Key, #bus_handle{channel=Channel}) ->
   #'exchange.declare_ok'{} = amqp_channel:call(Channel, ExchDeclare),
   ok.
 
-declare_queue(#bus_handle{channel=Channel}) ->
-  QueueDeclare = #'queue.declare'{},
+%% Options - Tuple list of k,v options
+%% http://www.rabbitmq.com/amqp-0-9-1-quickref.html
+declare_queue(BusHandle) when is_record(BusHandle,bus_handle) ->
+  declare_queue(BusHandle, []).
+
+declare_queue(BusHandle, Options) when is_record(BusHandle,bus_handle) ->
+  declare_queue(<<"">>, BusHandle, Options).
+
+declare_queue(Key, #bus_handle{channel=Channel}, Options) ->
+  case lists:keyfind(exclusive,1, Options) of
+    {_,true} -> Exclusive = true;
+    {_,false} -> Exclusive = false;
+    false -> Exclusive = false
+  end,
+  case lists:keyfind(durable,1, Options) of
+    {_,true} -> Durable = true;
+    {_,false} -> Durable = false;
+    false -> Durable = false
+  end,
+  case lists:keyfind(auto_delete,1, Options) of
+    {_,true} -> AutoDelete = true;
+    {_,false} -> AutoDelete = false;
+    false -> AutoDelete = false 
+  end,
+  case lists:keyfind(passive,1, Options) of
+    {_,true} -> Passive = true;
+    {_,false} -> Passive = false;
+    false -> Passive = false 
+  end,
+  case lists:keyfind(nowait,1, Options) of
+    {_,true} -> NoWait = true;
+    {_,false} -> NoWait = false;
+    false -> NoWait = false 
+  end,
+  QueueDeclare = #'queue.declare'{queue=Key, durable=Durable, exclusive=Exclusive,
+    auto_delete=AutoDelete, passive=Passive, nowait=NoWait},
   #'queue.declare_ok'{queue=Q,
     message_count=_OrderCount,
     consumer_count=_ConsumerCount} = amqp_channel:call(Channel, QueueDeclare),
   Q.
 
-declare_queue(Key, #bus_handle{channel=Channel}) ->
-  QueueDeclare = #'queue.declare'{queue=Key},
-  #'queue.declare_ok'{queue=Q,
-    message_count=_OrderCount,
-    consumer_count=_ConsumerCount} = amqp_channel:call(Channel, QueueDeclare),
-  Q.
-
-%% Exclusive - true | false
-declare_queue(Key, #bus_handle{channel=Channel}, Exclusive) ->
-  QueueDeclare = #'queue.declare'{queue=Key, exclusive=Exclusive},
-  #'queue.declare_ok'{queue=Q,
-    message_count=_OrderCount,
-    consumer_count=_ConsumerCount} = amqp_channel:call(Channel, QueueDeclare),
-  Q.
 
 bind(X, Q, BindKey, BusHandle) when is_record(BusHandle,bus_handle) ->
   Channel = BusHandle#bus_handle.channel,
