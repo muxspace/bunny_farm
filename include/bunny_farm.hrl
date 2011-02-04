@@ -4,5 +4,8 @@
 -include_lib("amqp_client/include/amqp_client.hrl").
 -record(bus_handle, {exchange, queue, routing_key, channel, conn}).
 -record(message, {payload, props=#'P_basic'{} }).
+%% Represents a generic remote procedure call
+-record(rpc, {procedure, args}).
+
 
 -endif.

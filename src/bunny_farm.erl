@@ -42,36 +42,10 @@ declare_queue(BusHandle, Options) when is_record(BusHandle,bus_handle) ->
   declare_queue(<<"">>, BusHandle, Options).
 
 declare_queue(Key, #bus_handle{channel=Channel}, Options) ->
-  case lists:keyfind(exclusive,1, Options) of
-    {_,true} -> Exclusive = true;
-    {_,false} -> Exclusive = false;
-    false -> Exclusive = false
-  end,
-  case lists:keyfind(durable,1, Options) of
-    {_,true} -> Durable = true;
-    {_,false} -> Durable = false;
-    false -> Durable = false
-  end,
-  case lists:keyfind(auto_delete,1, Options) of
-    {_,true} -> AutoDelete = true;
-    {_,false} -> AutoDelete = false;
-    false -> AutoDelete = false 
-  end,
-  case lists:keyfind(passive,1, Options) of
-    {_,true} -> Passive = true;
-    {_,false} -> Passive = false;
-    false -> Passive = false 
-  end,
-  case lists:keyfind(nowait,1, Options) of
-    {_,true} -> NoWait = true;
-    {_,false} -> NoWait = false;
-    false -> NoWait = false 
-  end,
-  QueueDeclare = #'queue.declare'{queue=Key, durable=Durable, exclusive=Exclusive,
-    auto_delete=AutoDelete, passive=Passive, nowait=NoWait},
-  #'queue.declare_ok'{queue=Q,
-    message_count=_OrderCount,
-    consumer_count=_ConsumerCount} = amqp_channel:call(Channel, QueueDeclare),
+  AllOptions = [{queue,Key}, {arguments,[]}] ++ Options,
+  QueueDeclare = farm_tools:to_queue_declare(AllOptions),
+  #'queue.declare_ok'{queue=Q, message_count=_OrderCount,
+      consumer_count=_ConsumerCount} = amqp_channel:call(Channel, QueueDeclare),
   Q.
 
 
@@ -91,7 +65,9 @@ consume(#bus_handle{queue=Q, channel=Channel}) ->
 publish(#message{payload=Payload,props=Props},
         #bus_handle{exchange=X, routing_key=K, channel=Channel}) ->
   BasicPublish = #'basic.publish'{exchange=X, routing_key=K}, 
-  amqp_channel:cast(Channel, BasicPublish, #amqp_msg{payload=Payload, props=Props});
+  amqp_channel:cast(Channel, BasicPublish,
+    #amqp_msg{payload=farm_tools:binarize(Payload),
+              props=farm_tools:to_amqp_props(Props)});
 
 publish(Payload, BusHandle) when is_record(BusHandle,bus_handle) ->
   publish(#message{payload=Payload}, BusHandle).
@@ -99,8 +75,11 @@ publish(Payload, BusHandle) when is_record(BusHandle,bus_handle) ->
 publish(#message{payload=Payload,props=Props},
         RoutingKey, #bus_handle{exchange=X, channel=Channel}) ->
   BasicPublish = #'basic.publish'{exchange=X, routing_key=RoutingKey}, 
-  amqp_channel:cast(Channel, BasicPublish, #amqp_msg{payload=Payload, props=Props});
+  amqp_channel:cast(Channel, BasicPublish,
+    #amqp_msg{payload=farm_tools:binarize(Payload),
+              props=farm_tools:to_amqp_props(Props)});
 
 publish(Payload, RoutingKey, BusHandle) when is_record(BusHandle,bus_handle) ->
   publish(#message{payload=Payload}, RoutingKey, BusHandle).
+
 
