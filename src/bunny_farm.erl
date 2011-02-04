@@ -62,22 +62,26 @@ consume(#bus_handle{queue=Q, channel=Channel}) ->
   amqp_channel:subscribe(Channel, BasicConsume, self()).
 
 
-publish(#message{payload=Payload, props=Props},
-        #bus_handle{exchange=X, routing_key=K, channel=Channel}) when is_list(Props) ->
+publish(Message, #bus_handle{exchange=X, routing_key=K, channel=Channel})
+    when is_record(Message,message) ->
+  Payload = Message#message.payload,
+  Props = Message#message.props,
+  AMsg = #amqp_msg{payload=farm_tools:binarize(Payload),
+                   props=farm_tools:to_amqp_props(Props)},
   BasicPublish = #'basic.publish'{exchange=X, routing_key=K}, 
-  amqp_channel:cast(Channel, BasicPublish,
-    #amqp_msg{payload=farm_tools:binarize(Payload),
-              props=farm_tools:to_amqp_props(Props)});
+  amqp_channel:cast(Channel, BasicPublish, AMsg);
 
 publish(Payload, BusHandle) when is_record(BusHandle,bus_handle) ->
   publish(#message{payload=Payload}, BusHandle).
 
-publish(#message{payload=Payload, props=Props},
-        RoutingKey, #bus_handle{exchange=X, channel=Channel}) when is_list(Props) ->
+publish(Message, RoutingKey, #bus_handle{exchange=X, channel=Channel}) 
+    when is_record(Message,message) ->
+  Payload = Message#message.payload,
+  Props = Message#message.props,
+  AMsg = #amqp_msg{payload=farm_tools:binarize(Payload),
+                   props=farm_tools:to_amqp_props(Props)},
   BasicPublish = #'basic.publish'{exchange=X, routing_key=RoutingKey}, 
-  amqp_channel:cast(Channel, BasicPublish,
-    #amqp_msg{payload=farm_tools:binarize(Payload),
-              props=farm_tools:to_amqp_props(Props)});
+  amqp_channel:cast(Channel, BasicPublish, AMsg);
 
 publish(Payload, RoutingKey, BusHandle) when is_record(BusHandle,bus_handle) ->
   publish(#message{payload=Payload}, RoutingKey, BusHandle).
