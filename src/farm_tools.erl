@@ -8,7 +8,7 @@
 %% Properties is a 'P_basic' record. We convert it back to a tuple
 %% list
 decode_properties(#amqp_msg{props=Properties}) ->
-  [_Name,Vs] = tuple_to_list(Properties),
+  [_Name|Vs] = tuple_to_list(Properties),
   Ks = record_info(fields,'queue.declare'),
   lists:zip(Ks,Vs).
 
