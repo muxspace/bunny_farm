@@ -62,8 +62,8 @@ consume(#bus_handle{queue=Q, channel=Channel}) ->
   amqp_channel:subscribe(Channel, BasicConsume, self()).
 
 
-publish(#message{payload=Payload,props=Props},
-        #bus_handle{exchange=X, routing_key=K, channel=Channel}) ->
+publish(#message{payload=Payload, props=Props},
+        #bus_handle{exchange=X, routing_key=K, channel=Channel}) when is_list(Props) ->
   BasicPublish = #'basic.publish'{exchange=X, routing_key=K}, 
   amqp_channel:cast(Channel, BasicPublish,
     #amqp_msg{payload=farm_tools:binarize(Payload),
@@ -72,8 +72,8 @@ publish(#message{payload=Payload,props=Props},
 publish(Payload, BusHandle) when is_record(BusHandle,bus_handle) ->
   publish(#message{payload=Payload}, BusHandle).
 
-publish(#message{payload=Payload,props=Props},
-        RoutingKey, #bus_handle{exchange=X, channel=Channel}) ->
+publish(#message{payload=Payload, props=Props},
+        RoutingKey, #bus_handle{exchange=X, channel=Channel}) when is_list(Props) ->
   BasicPublish = #'basic.publish'{exchange=X, routing_key=RoutingKey}, 
   amqp_channel:cast(Channel, BasicPublish,
     #amqp_msg{payload=farm_tools:binarize(Payload),

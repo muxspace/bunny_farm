@@ -37,7 +37,9 @@ listify(List, Sep) when is_list(List) ->
 binarize(List) when is_list(List) ->
   [H|T] = List,
   O = lists:foldl(fun(X,Y) -> Y ++ to_list(X) end, to_list(H), T),
-  list_to_binary(O).
+  list_to_binary(O);
+
+binarize(List) -> binarize([List]).
 
 %% Converts a tuple list of values to a queue.declare record
 to_queue_declare(Props) ->
