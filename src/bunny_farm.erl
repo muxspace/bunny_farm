@@ -42,7 +42,7 @@ declare_queue(BusHandle, Options) when is_record(BusHandle,bus_handle) ->
   declare_queue(<<"">>, BusHandle, Options).
 
 declare_queue(Key, #bus_handle{channel=Channel}, Options) ->
-  AllOptions = [{queue,Key}, {arguments,[]}] ++ Options,
+  AllOptions = [{queue,Key}, {ticket,0}, {arguments,[]}] ++ Options,
   QueueDeclare = farm_tools:to_queue_declare(AllOptions),
   #'queue.declare_ok'{queue=Q, message_count=_OrderCount,
       consumer_count=_ConsumerCount} = amqp_channel:call(Channel, QueueDeclare),
