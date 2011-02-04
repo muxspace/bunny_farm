@@ -19,7 +19,7 @@ decode_payload(Payload) ->
   binary_to_term(Payload).
 
 encode_payload(Payload) ->
-  term_to_binary(Payload).
+  binarize(Payload).
 
 to_list(Float) when is_float(Float) -> float_to_list(Float);
 to_list(Integer) when is_integer(Integer) -> integer_to_list(Integer);
