@@ -9,7 +9,7 @@
 %% list
 decode_properties(#amqp_msg{props=Properties}) ->
   [_Name|Vs] = tuple_to_list(Properties),
-  Ks = record_info(fields,'queue.declare'),
+  Ks = record_info(fields,'P_basic'),
   lists:zip(Ks,Vs).
 
 decode_payload(#amqp_msg{payload=Payload}) ->
