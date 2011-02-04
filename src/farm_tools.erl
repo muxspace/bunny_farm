@@ -5,7 +5,12 @@
 -export([binarize/1]).
 -export([to_queue_declare/1, to_amqp_props/1]).
 
-decode_properties(#amqp_msg{props=Properties}) -> binary_to_term(Properties).
+%% Properties is a 'P_basic' record. We convert it back to a tuple
+%% list
+decode_properties(#amqp_msg{props=Properties}) ->
+  [_Name,Vs] = tuple_to_list(Properties),
+  Ks = record_info(fields,'queue.declare'),
+  lists:zip(Ks,Vs).
 
 decode_payload(#amqp_msg{payload=Payload}) ->
   decode_payload(Payload);
