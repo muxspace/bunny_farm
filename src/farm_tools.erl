@@ -39,6 +39,8 @@ listify(List, Sep) when is_list(List) ->
   [H|T] = List,
   lists:foldl(fun(X,Y) -> Y ++ Sep ++ to_list(X) end, to_list(H), T).
   
+binarize(Binary) when is_binary(Binary) -> Binary;
+
 binarize(List) when is_list(List) ->
   [H|T] = List,
   O = lists:foldl(fun(X,Y) -> Y ++ to_list(X) end, to_list(H), T),
