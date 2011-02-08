@@ -1,6 +1,6 @@
 -module(bunny_farm).
 -include("bunny_farm.hrl").
--export([open/0, open/1, open/3, close/1]).
+-export([open/0, open/1, open/2, open/3, close/1]).
 -export([declare_exchange/2, declare_exchange/3,
   declare_queue/1, declare_queue/2, declare_queue/3,
   bind/4]).
@@ -9,13 +9,39 @@
 open() -> open(#bus_handle{}).
 
 open(BusHandle) when is_record(BusHandle,bus_handle) ->
-  open(network, #amqp_params{}, BusHandle).
+  open(network, #amqp_params{}, BusHandle);
+
+%% Convenience function for opening a connection for publishing 
+%% messages. The routing key can be included but if it is not,
+%% then the connection can be re-used for multiple routing keys
+%% on the same exchange.
+%% Example
+%%   BusHandle = bunny_farm:open(<<"my.exchange">>),
+%%   bunny_farm:publish(Message, K,BusHandle),
+open(X) ->
+  BusHandle = bunny_farm:open(#bus_handle{exchange=X}),
+  bunny_farm:declare_exchange(<<"topic">>, BusHandle),
+  BusHandle.
 
 open(Method, Params, BusHandle) when
     is_record(Params,amqp_params), is_record(BusHandle,bus_handle) ->
   {ok,Connection} = amqp_connection:start(Method, #amqp_params{}),
   {ok,Channel} = amqp_connection:open_channel(Connection),
-  BusHandle#bus_handle{channel=Channel, conn=Connection}.
+  BusHandle#bus_handle{channel=Channel, conn=Connection};
+
+%% Convenience function to open and declare all intermediate objects. This
+%% is the typical pattern for consuming messages from a topic exchange.
+%% @returns bus_handle
+%% Example
+%%   BusHandle = bunny_farm:open(X, K),
+%%   bunny_farm:consume(BusHandle),
+open(X, K, Options) when is_list(Options) ->
+  BusHandle0 = bunny_farm:open(#bus_handle{exchange=X}),
+  bunny_farm:declare_exchange(<<"topic">>, X, BusHandle0),
+  Q = bunny_farm:declare_queue(BusHandle0, Options),
+  bunny_farm:bind(X,Q, K, BusHandle0).
+
+open(X, K) -> open(X, K, [{exclusive,true}]).
 
 close(#bus_handle{channel=Channel, conn=Connection}) ->
   amqp_channel:close(Channel),
@@ -49,11 +75,13 @@ declare_queue(Key, #bus_handle{channel=Channel}, Options) ->
   Q.
 
 
+  
 bind(X, Q, BindKey, BusHandle) when is_record(BusHandle,bus_handle) ->
   Channel = BusHandle#bus_handle.channel,
   QueueBind = #'queue.bind'{exchange=X, queue=Q, routing_key=BindKey},
   #'queue.bind_ok'{} = amqp_channel:call(Channel, QueueBind),
   BusHandle#bus_handle{queue=Q}.
+
 
 consume(#bus_handle{queue=Q, channel=Channel}) ->
   BasicConsume = #'basic.consume'{queue=Q, no_ack=true},
