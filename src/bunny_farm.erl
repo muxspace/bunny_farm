@@ -4,7 +4,7 @@
 -export([declare_exchange/2, declare_exchange/3,
   declare_queue/1, declare_queue/2, declare_queue/3,
   bind/4]).
--export([consume/1, publish/2, publish/3]).
+-export([consume/1, publish/2, publish/3, rpc/3]).
 
 open() -> open(#bus_handle{}).
 
@@ -114,4 +114,13 @@ publish(Message, RoutingKey, #bus_handle{exchange=X, channel=Channel})
 publish(Payload, RoutingKey, BusHandle) when is_record(BusHandle,bus_handle) ->
   publish(#message{payload=Payload}, RoutingKey, BusHandle).
 
+
+%% Make an RPC call. The reply_to and correlation_ids are both set to ReplyTo
+rpc({Procedure,Arguments}, ReplyTo, BusHandle) ->
+  rpc(#rpc{procedure=Procedure, args=Arguments}, ReplyTo, BusHandle);
+
+rpc(RPC, ReplyTo, BusHandle) when is_record(RPC,rpc) ->
+  Props = [{reply_to,ReplyTo}, {correlation_id,ReplyTo}],
+  Message = #message{payload=RPC, props=Props},
+  bunny_farm:publish(Message, BusHandle).
 
