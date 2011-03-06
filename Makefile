@@ -1,20 +1,11 @@
 REBAR:=rebar
 
-.PHONY: all erl test clean doc pub sub
+.PHONY: all erl test clean doc 
 
 all: erl
 
 erl:
 	$(REBAR) get-deps compile
-
-pub:
-	ERL_LIBS=deps erl -sname publisher -pa ebin -run work_queue_p
-
-sub1:
-	ERL_LIBS=deps erl -sname consumer_1 -pa ebin -run work_queue_c
-
-sub2:
-	ERL_LIBS=deps erl -sname consumer_2 -pa ebin -run work_queue_c
 
 test: all
 	@mkdir -p .eunit
