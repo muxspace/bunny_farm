@@ -20,12 +20,15 @@ decode_payload(#amqp_msg{payload=Payload}) ->
 decode_payload(Payload) -> decode_payload(bson, Payload).
 decode_payload(erlang, Payload) -> binary_to_term(Payload);
 decode_payload(bson, Payload) ->
-  {Doc,_Bin} = bson_binary:get_document(Payload),
-  bson:reflate(Doc).
-
+  try
+    {Doc,_Bin} = bson_binary:get_document(Payload),
+    bson:reflate(Doc)
+  catch
+    error:{badmatch,_} -> decode_payload(erlang, Payload)
+  end.
 
 encode_payload(Payload) -> encode_payload(bson, Payload).
-encode_payload(erlang, Payload) -> binarize(Payload);
+encode_payload(erlang, Payload) -> term_to_binary(Payload);
 encode_payload(bson, Payload) ->
   bson_binary:put_document(bson:document(Payload)).
 
@@ -50,6 +53,7 @@ listify(List, Sep) when is_list(List) ->
   [H|T] = List,
   lists:foldl(fun(X,Y) -> Y ++ Sep ++ to_list(X) end, to_list(H), T).
   
+%% Convenience function to convert values to binaries. This is deprecated.
 binarize(Binary) when is_binary(Binary) -> Binary;
 
 binarize(List) when is_list(List) ->

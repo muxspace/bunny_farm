@@ -18,11 +18,14 @@ binarize_test() ->
   Exp = Act.
 
 bson_simple_test() ->
-  %TupleList = [ {fruits, [{fruit1, peach}, {fruit2, pear}]}, {grain, barley} ],
   TupleList = [ {fruit, pear}, {grain, barley} ],
-  %Doc = { fruits, {fruit1,peach, fruit2,pear}, grain, barley },
-  %Exp = bson:put_document(Doc),
   Encoded = farm_tools:encode_payload(bson, TupleList),
   Decoded = farm_tools:decode_payload(bson, Encoded),
   TupleList = Decoded.
 
+bson_decode_test() ->
+  TupleList = [ {fruit, pear}, {grain, barley} ],
+  Encoded = farm_tools:encode_payload(erlang, TupleList),
+  Decoded = farm_tools:decode_payload(Encoded),
+  TupleList = Decoded.
+  
