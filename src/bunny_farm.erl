@@ -120,8 +120,10 @@ publish(Payload, RoutingKey, #bus_handle{}=BusHandle) ->
 rpc({Procedure,Arguments}, ReplyTo, BusHandle) ->
   rpc(#rpc{procedure=Procedure, args=Arguments}, ReplyTo, BusHandle);
 
-rpc(RPC, ReplyTo, BusHandle) when is_record(RPC,rpc) ->
+rpc(RPC, ReplyTo, #bus_handle{exchange=X, routing_key=K, channel=Channel}) when is_record(RPC,rpc) ->
   Props = [{reply_to,ReplyTo}, {correlation_id,ReplyTo}],
-  Message = #message{payload=RPC, props=Props},
-  bunny_farm:publish(Message, BusHandle).
+  AMsg = #amqp_msg{payload=farm_tools:encode_payload(erlang,RPC),
+                   props=farm_tools:to_amqp_props(Props)},
+  BasicPublish = #'basic.publish'{exchange=X, routing_key=K}, 
+  amqp_channel:cast(Channel, BasicPublish, AMsg).
 
