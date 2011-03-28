@@ -1,6 +1,8 @@
 -module(farm_tools).
 -include("bunny_farm.hrl").
--export([decode_properties/1, decode_payload/1, encode_payload/1]).
+-export([decode_properties/1, 
+  decode_payload/1, decode_payload/2,
+  encode_payload/1, encode_payload/2]).
 -export([to_list/1, atomize/1, atomize/2, listify/1, listify/2]).
 -export([binarize/1]).
 -export([to_queue_declare/1, to_amqp_props/1]).
@@ -15,23 +17,32 @@ decode_properties(#amqp_msg{props=Properties}) ->
 decode_payload(#amqp_msg{payload=Payload}) ->
   decode_payload(Payload);
   
-decode_payload(Payload) -> 
-  binary_to_term(Payload).
+decode_payload(Payload) -> decode_payload(default, Payload).
+decode_payload(default, Payload) -> binary_to_term(Payload);
+decode_payload(bson, Payload) ->
+  {Doc,_Bin} = bson_binary:get_document(Payload),
+  bson:reflate(Doc).
 
-encode_payload(Payload) ->
-  binarize(Payload).
 
+encode_payload(Payload) -> encode_payload(default, Payload).
+encode_payload(default, Payload) -> binarize(Payload);
+encode_payload(bson, Payload) ->
+  bson_binary:put_document(bson:document(Payload)).
+
+%% Convert types to strings
 to_list(Float) when is_float(Float) -> float_to_list(Float);
 to_list(Integer) when is_integer(Integer) -> integer_to_list(Integer);
 to_list(Atom) when is_atom(Atom) -> atom_to_list(Atom);
 to_list(List) when is_list(List) -> List.
 
+%% Convert strings to atoms
 atomize(List) when is_list(List) ->
   list_to_atom(lists:foldl(fun(X,Y) -> Y ++ to_list(X) end, [], List)).
 
 atomize(List, Sep) when is_list(List) ->
   list_to_atom(listify(List, Sep)).
 
+%% Convert a list of elements into a single string
 listify(List) when is_list(List) ->
   listify(List, " ").
 
