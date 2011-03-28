@@ -90,8 +90,8 @@ consume(#bus_handle{queue=Q, channel=Channel}) ->
   amqp_channel:subscribe(Channel, BasicConsume, self()).
 
 
-publish(Message, #bus_handle{exchange=X, routing_key=K, channel=Channel})
-    when is_record(Message,message) ->
+publish(#message{}=Message,
+        #bus_handle{exchange=X, routing_key=K, channel=Channel}) ->
   Payload = Message#message.payload,
   Props = Message#message.props,
   AMsg = #amqp_msg{payload=farm_tools:encode_payload(Payload),
@@ -99,11 +99,12 @@ publish(Message, #bus_handle{exchange=X, routing_key=K, channel=Channel})
   BasicPublish = #'basic.publish'{exchange=X, routing_key=K}, 
   amqp_channel:cast(Channel, BasicPublish, AMsg);
 
-publish(Payload, BusHandle) when is_record(BusHandle,bus_handle) ->
+publish(Payload, #bus_handle{}=BusHandle) ->
   publish(#message{payload=Payload}, BusHandle).
 
-publish(Message, RoutingKey, #bus_handle{exchange=X, channel=Channel}) 
-    when is_record(Message,message) ->
+%% This is the recommended call to use as the same exchange can be reused
+publish(#message{}=Message, RoutingKey,
+        #bus_handle{exchange=X, channel=Channel}) ->
   Payload = Message#message.payload,
   Props = Message#message.props,
   AMsg = #amqp_msg{payload=farm_tools:encode_payload(Payload),
@@ -111,7 +112,7 @@ publish(Message, RoutingKey, #bus_handle{exchange=X, channel=Channel})
   BasicPublish = #'basic.publish'{exchange=X, routing_key=RoutingKey}, 
   amqp_channel:cast(Channel, BasicPublish, AMsg);
 
-publish(Payload, RoutingKey, BusHandle) when is_record(BusHandle,bus_handle) ->
+publish(Payload, RoutingKey, #bus_handle{}=BusHandle) ->
   publish(#message{payload=Payload}, RoutingKey, BusHandle).
 
 

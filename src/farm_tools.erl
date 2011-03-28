@@ -17,15 +17,15 @@ decode_properties(#amqp_msg{props=Properties}) ->
 decode_payload(#amqp_msg{payload=Payload}) ->
   decode_payload(Payload);
   
-decode_payload(Payload) -> decode_payload(default, Payload).
-decode_payload(default, Payload) -> binary_to_term(Payload);
+decode_payload(Payload) -> decode_payload(bson, Payload).
+decode_payload(erlang, Payload) -> binary_to_term(Payload);
 decode_payload(bson, Payload) ->
   {Doc,_Bin} = bson_binary:get_document(Payload),
   bson:reflate(Doc).
 
 
-encode_payload(Payload) -> encode_payload(default, Payload).
-encode_payload(default, Payload) -> binarize(Payload);
+encode_payload(Payload) -> encode_payload(bson, Payload).
+encode_payload(erlang, Payload) -> binarize(Payload);
 encode_payload(bson, Payload) ->
   bson_binary:put_document(bson:document(Payload)).
 
