@@ -125,5 +125,15 @@ rpc(RPC, ReplyTo, #bus_handle{exchange=X, routing_key=K, channel=Channel}) when 
   AMsg = #amqp_msg{payload=farm_tools:encode_payload(erlang,RPC),
                    props=farm_tools:to_amqp_props(Props)},
   BasicPublish = #'basic.publish'{exchange=X, routing_key=K}, 
+  amqp_channel:cast(Channel, BasicPublish, AMsg);
+
+%% This ts the recommended way to call this function
+rpc(#message{payload=#rpc{}}=Message, K,
+    #bus_handle{exchange=X,channel=Channel}) ->
+  Payload = Message#message.payload,
+  Props = Message#message.props,
+  AMsg = #amqp_msg{payload=farm_tools:encode_payload(erlang,Payload),
+                   props=farm_tools:to_amqp_props(Props)},
+  BasicPublish = #'basic.publish'{exchange=X, routing_key=K}, 
   amqp_channel:cast(Channel, BasicPublish, AMsg).
 
