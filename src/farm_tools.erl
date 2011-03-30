@@ -5,7 +5,7 @@
   encode_payload/1, encode_payload/2]).
 -export([to_list/1, atomize/1, atomize/2, listify/1, listify/2]).
 -export([binarize/1]).
--export([to_queue_declare/1, to_amqp_props/1]).
+-export([to_queue_declare/1, to_amqp_props/1, reply_to/1]).
 
 %% Properties is a 'P_basic' record. We convert it back to a tuple
 %% list
@@ -53,15 +53,19 @@ listify(List, Sep) when is_list(List) ->
   [H|T] = List,
   lists:foldl(fun(X,Y) -> Y ++ Sep ++ to_list(X) end, to_list(H), T).
   
-%% Convenience function to convert values to binaries. This is deprecated.
+%% Convenience function to convert values to binary strings. Useful for
+%% creating binary names for exchanges or routing keys. Not recommended 
+%% for payloads.
 binarize(Binary) when is_binary(Binary) -> Binary;
 
+%% Example
+%%   farm_tools:binarize([my, "-", 2]) => <<"my-2">>
 binarize(List) when is_list(List) ->
   [H|T] = List,
   O = lists:foldl(fun(X,Y) -> Y ++ to_list(X) end, to_list(H), T),
   list_to_binary(O);
 
-binarize(Other) -> term_to_binary(Other).
+binarize(Other) -> list_to_binary(to_list(Other)).
 
 %% Converts a tuple list of values to a queue.declare record
 to_queue_declare(Props) ->
@@ -72,4 +76,9 @@ to_queue_declare(Props) ->
 to_amqp_props(Props) ->
   list_to_tuple(['P_basic'|[proplists:get_value(X,Props) || 
     X <- record_info(fields,'P_basic')]]).
+
+%% Convenience function to get the reply_to property
+reply_to(Content) ->
+  Props = farm_tools:decode_properties(Content),
+  proplists:get_value(reply_to, Props).
 

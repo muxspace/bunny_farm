@@ -12,9 +12,14 @@ atomize_test() ->
   Act = farm_tools:atomize([one, "_", 1]),
   Exp = Act.
   
-binarize_test() ->
+binarize_list_test() ->
   Exp = <<"one_1">>,
   Act = farm_tools:binarize([one, "_", 1]),
+  Exp = Act.
+
+binarize_other_test() ->
+  Exp = <<"one">>,
+  Act = farm_tools:binarize(one),
   Exp = Act.
 
 bson_simple_test() ->

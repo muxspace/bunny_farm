@@ -4,7 +4,7 @@
 -export([declare_exchange/2, declare_exchange/3,
   declare_queue/1, declare_queue/2, declare_queue/3,
   bind/4]).
--export([consume/1, publish/2, publish/3, rpc/3]).
+-export([consume/1, publish/2, publish/3, rpc/3, respond/3]).
 
 open() -> open(#bus_handle{}).
 
@@ -120,7 +120,7 @@ publish(Payload, RoutingKey, #bus_handle{}=BusHandle) ->
 rpc({Procedure,Arguments}, ReplyTo, BusHandle) ->
   rpc(#rpc{procedure=Procedure, args=Arguments}, ReplyTo, BusHandle);
 
-rpc(RPC, ReplyTo, #bus_handle{exchange=X, routing_key=K, channel=Channel}) when is_record(RPC,rpc) ->
+rpc(#rpc{}=RPC, ReplyTo, #bus_handle{exchange=X, routing_key=K, channel=Channel}) ->
   Props = [{reply_to,ReplyTo}, {correlation_id,ReplyTo}],
   AMsg = #amqp_msg{payload=farm_tools:encode_payload(erlang,RPC),
                    props=farm_tools:to_amqp_props(Props)},
@@ -135,5 +135,15 @@ rpc(#message{payload=#rpc{}}=Message, K,
   AMsg = #amqp_msg{payload=farm_tools:encode_payload(erlang,Payload),
                    props=farm_tools:to_amqp_props(Props)},
   BasicPublish = #'basic.publish'{exchange=X, routing_key=K}, 
+  amqp_channel:cast(Channel, BasicPublish, AMsg).
+
+%% This is used to send the response of an RPC. The primary difference 
+%% between this and publish is that the data is retained as an erlang
+%% binary.
+respond(#message{payload=Payload, props=Props}, RoutingKey,
+        #bus_handle{exchange=X,channel=Channel}) ->
+  AMsg = #amqp_msg{payload=farm_tools:encode_payload(erlang,Payload),
+                   props=farm_tools:to_amqp_props(Props)},
+  BasicPublish = #'basic.publish'{exchange=X, routing_key=RoutingKey}, 
   amqp_channel:cast(Channel, BasicPublish, AMsg).
 
