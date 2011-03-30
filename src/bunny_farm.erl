@@ -145,5 +145,7 @@ respond(#message{payload=Payload, props=Props}, RoutingKey,
   AMsg = #amqp_msg{payload=farm_tools:encode_payload(erlang,Payload),
                    props=farm_tools:to_amqp_props(Props)},
   BasicPublish = #'basic.publish'{exchange=X, routing_key=RoutingKey}, 
-  amqp_channel:cast(Channel, BasicPublish, AMsg).
+  amqp_channel:cast(Channel, BasicPublish, AMsg);
 
+respond(Payload, RoutingKey, #bus_handle{}=BusHandle) ->
+  respond(#message{payload=Payload}, RoutingKey, BusHandle).
