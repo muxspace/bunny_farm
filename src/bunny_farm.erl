@@ -4,7 +4,8 @@
 -export([declare_exchange/2, declare_exchange/3,
   declare_queue/1, declare_queue/2, declare_queue/3,
   bind/4]).
--export([consume/1, consume/2, publish/2, publish/3, rpc/4, respond/3]).
+-export([consume/1, consume/2, publish/2, publish/3, 
+  rpc/3, rpc/4, respond/3]).
 
 %% Convenience function for opening a connection for publishing 
 %% messages. The routing key can be included but if it is not,
@@ -78,6 +79,13 @@ publish(Payload, RoutingKey, #bus_handle{}=BusHandle) ->
   publish(#message{payload=Payload}, RoutingKey, BusHandle).
 
 
+
+rpc(#message{payload=Payload, props=Props}, K,
+    #bus_handle{exchange=X, channel=Channel}) ->
+  AMsg = #amqp_msg{payload=farm_tools:encode_payload(erlang,Payload),
+                   props=farm_tools:to_amqp_props(Props)},
+  BasicPublish = #'basic.publish'{exchange=X, routing_key=K}, 
+  amqp_channel:cast(Channel, BasicPublish, AMsg).
 
 rpc(Payload, ReplyTo, K, #bus_handle{exchange=X, channel=Channel}) ->
   Props = [{reply_to,ReplyTo}, {correlation_id,ReplyTo}],
