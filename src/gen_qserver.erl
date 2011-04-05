@@ -8,7 +8,7 @@
          handle_info/2,
          terminate/2, code_change/3]).
 -export([call/2, call/3, cast/2]).
--export([get_bus/2 ]).
+-export([get_bus/2, put_bus/2 ]).
 
 -record(state, {module, module_state, handles}).
 
@@ -37,6 +37,9 @@ start_link(ServerName, Module, Args, Options, ConnSpecs) ->
 
 get_bus(ServerRef, Exchange) ->
   gen_server:call(ServerRef, {get_bus, Exchange}).
+
+put_bus(ServerRef, ConnSpec) ->
+  gen_server:call(ServerRef, {put_bus, ConnSpec}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PRIVATE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 tag() ->
@@ -111,6 +114,12 @@ handle_call(Request, From, State) ->
   {reply, Response, NextState} = Module:handle_call(Request,From,ModuleState),
   {reply, Response, State#state{module_state=NextState}}.
 
+
+%% This replaces existing handles with the same exchange name.
+handle_cast({put_bus,ConnSpec}, State) ->
+  Conn = connect(ConnSpec),
+  Handles = lists:keystore(element(1,Conn), 1, State#state.handles, Conn),
+  {noreply, State#state{handles=Handles}};
 
 handle_cast(Request, State) ->
   Module = State#state.module,
