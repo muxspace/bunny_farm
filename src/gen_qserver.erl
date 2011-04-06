@@ -40,6 +40,14 @@ tag() ->
   In = float_to_list(element(3,now()) + random:uniform()),
   base64:encode(In).
 
+bus(CachePid, {id,X}) ->
+  case qcache:get_bus(CachePid, {id,X}) of
+    not_found ->
+      Conn = connect(X),
+      qcache:put_conn(CachePid, Conn),
+      proplists:get_value(handle,Conn);
+    BH -> BH
+  end.
 
 %% Consume
 -spec connect({exchange(), routing_key()}) -> [ {exchange(), boolean(), bus_handle()} ].
@@ -116,17 +124,7 @@ handle_info({#'basic.deliver'{routing_key=Key,exchange=OX}, Content}, State) ->
     true -> 
       {reply,Response,State} = handle_call({Key, Payload}, self(), State),
       {X,ReplyTo} = farm_tools:reply_to(Content, OX),
-      case qcache:get_bus(CachePid, {id,X}) of
-        not_found ->
-          Conn = connect(X),
-          qcache:put_conn(CachePid, Conn),
-          BusHandle = proplists:get_value(handle,Conn);
-          %Handles = [Conn | State#gen_qstate.handles];
-        BH ->
-          BusHandle = BH
-          %Handles = State#gen_qstate.handles
-      end,
-          
+      BusHandle = bus(CachePid, {id,X}),
       %error_logger:info_msg("[gen_qserver] Responding to ~p => ~p~n", [X,ReplyTo]),
       bunny_farm:respond(Response, ReplyTo, BusHandle),
       %error_logger:info_msg("[gen_qserver] Sent"),

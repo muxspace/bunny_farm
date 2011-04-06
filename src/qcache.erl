@@ -84,7 +84,7 @@ conn({id,Exchange}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% GEN_SERVER %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 init(_) ->
-  error_logger:info_msg("[qcache] Starting up~n"),
+  %error_logger:info_msg("[qcache] Starting up~n"),
   {ok, #state{}}.
 
 handle_call(connections, _From, State) ->
