@@ -1,6 +1,7 @@
 -module(gen_qserver).
 -behaviour(gen_server).
 -include("bunny_farm.hrl").
+-include("private_macros.hrl").
 -export([behaviour_info/1]).
 -export([start_link/4, start_link/5, init/1,
          handle_call/3,
@@ -8,14 +9,13 @@
          handle_info/2,
          terminate/2, code_change/3]).
 -export([call/2, call/3, cast/2]).
--export([get_bus/2, put_bus/2 ]).
 
--record(state, {module, module_state, handles}).
+-record(gen_qstate, {module, module_state, cache_pid}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PUBLIC %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 behaviour_info(callbacks) ->
-  [{init,1},
+  [{init,2},
    {handle_call,3},
    {handle_cast,2},
    {terminate,2}].
@@ -35,22 +35,10 @@ start_link(Module, Args, Options, Connections) ->
 start_link(ServerName, Module, Args, Options, ConnSpecs) ->
   gen_server:start_link(ServerName, ?MODULE, [Module,Args,ConnSpecs], Options).
 
-get_bus(ServerRef, Exchange) ->
-  gen_server:call(ServerRef, {get_bus, Exchange}).
-
-put_bus(ServerRef, ConnSpec) ->
-  gen_server:call(ServerRef, {put_bus, ConnSpec}).
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PRIVATE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 tag() ->
   In = float_to_list(element(3,now()) + random:uniform()),
   base64:encode(In).
-
-bus({tag,Tag}, State) ->
-  lists:keyfind(Tag,2,State#state.handles);
-
-bus({exchange,Exchange}, State) ->
-  lists:keyfind(Exchange,1,State#state.handles).
 
 
 %% Consume
@@ -61,7 +49,7 @@ connect({<<Exchange/binary>>, <<Key/binary>>}) ->
   Tag = tag(),
   bunny_farm:consume(Handle, [{consumer_tag,Tag}]),
   %error_logger:info_msg("[gen_qserver] Returning handle spec"),
-  {Exchange, Tag, false, Handle};
+  [{id,Exchange}, {tag,Tag}, {handle,Handle}];
 
 %% Consume
 connect({Exchange, Key}) ->
@@ -72,103 +60,91 @@ connect(<<Exchange/binary>>) ->
   %error_logger:info_msg("[gen_qserver] Opening ~p~n", [Exchange]),
   Handle = bunny_farm:open(Exchange),
   %error_logger:info_msg("[gen_qserver] Returning handle spec"),
-  {Exchange, <<"">>, true, Handle};
+  [{id,Exchange}, {tag,<<"">>}, {active,true}, {handle,Handle}];
 
 %% Publish
 connect(Exchange) ->
   connect(farm_tools:binarize(Exchange)).
 
-activate_bus({tag,Tag}, Handles) ->
-  case lists:keyfind(Tag,2, Handles) of
-    %% TODO Some sort of error needs to be thrown if the Tag doesn't exist
-    false -> Handles;
-    {Exchange,Tag,_,Bus} ->
-      lists:keystore(Tag,2,Handles,{Exchange,Tag,true,Bus})
-  end.
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% GEN_SERVER %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 init([Module, Args, ConnSpecs]) ->
+  {ok,Pid} = qcache:start_link(),
   random:seed(now()),
-  case Module:init(Args) of
+  case Module:init(Args, Pid) of
     {ok, ModuleState} ->
       Handles = lists:map(fun(Conn) -> connect(Conn) end, ConnSpecs),
-      State = #state{module=Module, module_state=ModuleState, handles=Handles},
+      qcache:put_conns(Pid, Handles),
+      State = #gen_qstate{module=Module, module_state=ModuleState, cache_pid=Pid},
       Response = {ok, State};
     {ok, ModuleState, Timeout} ->
       Handles = lists:map(fun(Conn) -> connect(Conn) end, ConnSpecs),
-      State = #state{module=Module, module_state=ModuleState, handles=Handles},
+      qcache:put_conns(Pid, Handles),
+      State = #gen_qstate{module=Module, module_state=ModuleState, cache_pid=Pid},
       Response = {ok, State, Timeout};
     {stop, Reason} ->
       Response = {stop, Reason}
   end,
   Response.
 
-handle_call({get_bus,Exchange}, _From, State) ->
-  BusHandle = bus({exchange,Exchange}, State),
-  {reply, BusHandle, State};
-
 handle_call(Request, From, State) ->
-  Module = State#state.module,
-  ModuleState = State#state.module_state,
+  Module = State#gen_qstate.module,
+  ModuleState = State#gen_qstate.module_state,
   {reply, Response, NextState} = Module:handle_call(Request,From,ModuleState),
-  {reply, Response, State#state{module_state=NextState}}.
+  {reply, Response, State#gen_qstate{module_state=NextState}}.
 
-
-%% This replaces existing handles with the same exchange name.
-handle_cast({put_bus,ConnSpec}, State) ->
-  Conn = connect(ConnSpec),
-  Handles = lists:keystore(element(1,Conn), 1, State#state.handles, Conn),
-  {noreply, State#state{handles=Handles}};
 
 handle_cast(Request, State) ->
-  Module = State#state.module,
-  ModuleState = State#state.module_state,
+  Module = State#gen_qstate.module,
+  ModuleState = State#gen_qstate.module_state,
   {noreply, NextState} = Module:handle_cast(Request,ModuleState),
-  {noreply, State#state{module_state=NextState}}.
+  {noreply, State#gen_qstate{module_state=NextState}}.
 
 
 
 %% Tags are auto-generated during subscription
 handle_info(#'basic.consume_ok'{consumer_tag=Tag}, State) ->
   %error_logger:info_msg("Connection ACK~n",[]),
-  Handles = activate_bus({tag,Tag}, State#state.handles),
-  {noreply, State#state{handles=Handles}};
+  qcache:activate(State#gen_qstate.cache_pid, {tag,Tag}),
+  {noreply, State};
 
 % Handle messages coming off the bus
 handle_info({#'basic.deliver'{routing_key=Key,exchange=OX}, Content}, State) ->
+  CachePid = State#gen_qstate.cache_pid,
   Payload = farm_tools:decode_payload(Content),
   case farm_tools:is_rpc(Content) of
     true -> 
       {reply,Response,State} = handle_call({Key, Payload}, self(), State),
       {X,ReplyTo} = farm_tools:reply_to(Content, OX),
-      case bus({exchange,X}, State) of
-        false ->
+      case qcache:get_bus(CachePid, {id,X}) of
+        not_found ->
           Conn = connect(X),
-          BusHandle = element(4,Conn),
-          Handles = [Conn | State#state.handles];
-        Conn ->
-          BusHandle = element(4,Conn),
-          Handles = State#state.handles
+          qcache:put_conn(CachePid, Conn),
+          BusHandle = proplists:get_value(handle,Conn);
+          %Handles = [Conn | State#gen_qstate.handles];
+        BH ->
+          BusHandle = BH
+          %Handles = State#gen_qstate.handles
       end,
           
       %error_logger:info_msg("[gen_qserver] Responding to ~p => ~p~n", [X,ReplyTo]),
       bunny_farm:respond(Response, ReplyTo, BusHandle),
       %error_logger:info_msg("[gen_qserver] Sent"),
-      {noreply, State#state{handles=Handles}};
+      {noreply, State};
     _ ->
       handle_cast(Payload, State)
   end.
 
 
 terminate(Reason, State) ->
-  Module = State#state.module,
-  ModuleState = State#state.module_state,
+  Handles = qcache:connections(State#gen_qstate.cache_pid),
+  Module = State#gen_qstate.module,
+  ModuleState = State#gen_qstate.module_state,
   Module:terminate(Reason, ModuleState),
-  Fn = fun({_,Tag,_,#bus_handle{}=BusHandle}) ->
-    bunny_farm:close(BusHandle, Tag)
+  Fn = fun(PList) ->
+    bunny_farm:close(?PV(handle,PList), ?PV(tag,PList))
   end,
-  lists:map(Fn, State#state.handles),
+  lists:map(Fn, Handles),
   ok.
 
 code_change(_OldVersion, State, _Extra) ->

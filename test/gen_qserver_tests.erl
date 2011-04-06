@@ -10,7 +10,8 @@ main_test_() ->
     [ fun init_value/0,
       fun set_value_normal/0,
       fun get_value_queue/0,
-      fun set_value_queue/0
+      fun set_value_queue/0,
+      fun get_connection/0
     ]
   }.
 
@@ -79,4 +80,10 @@ set_value_queue() ->
   bunny_farm:close(PubBus),
   ?assertEqual(5, Act).
 
+
+get_connection() ->
+  Conn = my_qserver:get_connection(),
+  Handle = proplists:get_value(handle,Conn),
+  ?assertEqual(<<"exchange.two">>, proplists:get_value(id,Conn)),
+  ?assertEqual(bus_handle, element(1,Handle)).
 
