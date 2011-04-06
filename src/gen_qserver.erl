@@ -130,7 +130,7 @@ handle_info({#'basic.deliver'{routing_key=Key,exchange=OX}, Content}, State) ->
       %error_logger:info_msg("[gen_qserver] Sent"),
       {noreply, NewState};
     _ ->
-      handle_cast(Payload, State)
+      handle_cast({Key,Payload}, State)
   end.
 
 
