@@ -2,7 +2,7 @@
  [
   {description, ""},
   {vsn, "1.1.0"},
-  {modules, [bunny_farm]},
+  {modules, [bunny_farm, farm_tools, gen_qserver, qcache]},
   {registered, []},
   {applications, [
                   kernel,
