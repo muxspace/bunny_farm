@@ -122,13 +122,13 @@ handle_info({#'basic.deliver'{routing_key=Key,exchange=OX}, Content}, State) ->
   Payload = farm_tools:decode_payload(Content),
   case farm_tools:is_rpc(Content) of
     true -> 
-      {reply,Response,State} = handle_call({Key, Payload}, self(), State),
+      {reply,Response,NewState} = handle_call({Key, Payload}, self(), State),
       {X,ReplyTo} = farm_tools:reply_to(Content, OX),
       BusHandle = bus(CachePid, {id,X}),
       %error_logger:info_msg("[gen_qserver] Responding to ~p => ~p~n", [X,ReplyTo]),
       bunny_farm:respond(Response, ReplyTo, BusHandle),
       %error_logger:info_msg("[gen_qserver] Sent"),
-      {noreply, State};
+      {noreply, NewState};
     _ ->
       handle_cast(Payload, State)
   end.
