@@ -112,7 +112,7 @@ handle_cast({put_conns,Conns}, State) when is_list(Conns) ->
     lists:keystore(QConn#qconn.id, 2, Acc, QConn)
   end,
   Handles = lists:foldl(Fn, State#state.handles, Conns),
-  error_logger:info_msg("[qcache] Storing handles:~n  ~p~n", [Handles]),
+  ?info("Storing handles:~n  ~p", [Handles]),
   {noreply, State#state{handles=Handles}};
 
 handle_cast({activate, {tag,Tag}}, State) ->

@@ -52,7 +52,7 @@ bus(CachePid, {id,X}) ->
 %% Consume
 -spec connect({exchange(), routing_key()}) -> [ {exchange(), boolean(), bus_handle()} ].
 connect({<<Exchange/binary>>, <<Key/binary>>}) ->
-  %error_logger:info_msg("[gen_qserver] Opening ~p => ~p~n", [Exchange,Key]),
+  ?info("Opening ~p => ~p for consuming", [Exchange,Key]),
   Handle = bunny_farm:open(Exchange,Key),
   Tag = tag(),
   bunny_farm:consume(Handle, [{consumer_tag,Tag}]),
@@ -65,7 +65,7 @@ connect({Exchange, Key}) ->
 
 %% Publish
 connect(<<Exchange/binary>>) ->
-  %error_logger:info_msg("[gen_qserver] Opening ~p~n", [Exchange]),
+  ?info("Opening ~p for publishing", [Exchange]),
   Handle = bunny_farm:open(Exchange),
   %error_logger:info_msg("[gen_qserver] Returning handle spec"),
   [{id,Exchange}, {tag,<<"">>}, {active,true}, {handle,Handle}];
@@ -112,7 +112,7 @@ handle_cast(Request, State) ->
 
 %% Tags are auto-generated during subscription
 handle_info(#'basic.consume_ok'{consumer_tag=Tag}, State) ->
-  %error_logger:info_msg("Connection ACK~n",[]),
+  ?info("Connection ACK on consumer_tag ~p",[Tag]),
   qcache:activate(State#gen_qstate.cache_pid, {tag,Tag}),
   {noreply, State};
 
@@ -125,7 +125,7 @@ handle_info({#'basic.deliver'{routing_key=Key,exchange=OX}, Content}, State) ->
       {reply,Response,NewState} = handle_call({Key, Payload}, self(), State),
       {X,ReplyTo} = farm_tools:reply_to(Content, OX),
       BusHandle = bus(CachePid, {id,X}),
-      %error_logger:info_msg("[gen_qserver] Responding to ~p => ~p~n", [X,ReplyTo]),
+      ?info("Responding to ~p => ~p", [X,ReplyTo]),
       bunny_farm:respond(Response, ReplyTo, BusHandle),
       %error_logger:info_msg("[gen_qserver] Sent"),
       {noreply, NewState};

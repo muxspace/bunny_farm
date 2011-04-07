@@ -1,5 +1,6 @@
 -module(bunny_farm).
 -include("bunny_farm.hrl").
+-include("private_macros.hrl").
 -export([open/1, open/2, open/3, close/1, close/2]).
 -export([declare_exchange/2, declare_exchange/3,
   declare_queue/1, declare_queue/2, declare_queue/3,
@@ -56,8 +57,7 @@ consume(#bus_handle{}=BusHandle) ->
 consume(#bus_handle{queue=Q,channel=Channel}, Options) when is_list(Options) ->
   AllOptions = [{queue,Q}, {no_ack,true}] ++ Options,
   BasicConsume = farm_tools:to_basic_consume(AllOptions),
-  Msg = "[bunny_farm] Sending subscription request:~n  ~p~n",
-  error_logger:info_msg(Msg, [BasicConsume]),
+  ?info("Sending subscription request:~n  ~p", [BasicConsume]),
   amqp_channel:subscribe(Channel, BasicConsume, self()).
 
 
