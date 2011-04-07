@@ -26,13 +26,17 @@ open(X) ->
 %% Example
 %%   BusHandle = bunny_farm:open(X, K),
 %%   bunny_farm:consume(BusHandle),
-open(X, K) -> open(X, K, [{exclusive,true}]).
+open(X, K) -> open(X, K, []).
 
-open(X, K, Options) when is_list(Options) ->
+open(X, Key, Options) when is_list(Options) ->
+  Defaults = [{exclusive,true}],
+  Fn = fun({K,V},Acc) -> lists:keystore(K,1,Acc,{K,V}) end,
+  AllOptions = lists:foldl(Fn, Defaults, Options),
+
   BusHandle = open_it(#bus_handle{exchange=X}),
   bunny_farm:declare_exchange(<<"topic">>, BusHandle),
-  Q = bunny_farm:declare_queue(BusHandle, Options),
-  bunny_farm:bind(X,Q, K, BusHandle).
+  Q = bunny_farm:declare_queue(BusHandle, AllOptions),
+  bunny_farm:bind(X,Q, Key, BusHandle).
 
 
 close(#bus_handle{channel=Channel, conn=Connection}) ->
@@ -130,7 +134,9 @@ declare_queue(#bus_handle{}=BusHandle, Options) ->
   declare_queue(<<"">>, BusHandle, Options).
 
 declare_queue(Key, #bus_handle{channel=Channel}, Options) ->
-  AllOptions = [{queue,Key}, {ticket,0}, {arguments,[]}] ++ Options,
+  Defaults = [{queue,Key}, {ticket,0}, {arguments,[]}],
+  Fn = fun({K,V},Acc) -> lists:keystore(K,1,Acc,{K,V}) end,
+  AllOptions = lists:foldl(Fn, Defaults, Options),
   QueueDeclare = farm_tools:to_queue_declare(AllOptions),
   #'queue.declare_ok'{queue=Q, message_count=_OrderCount,
       consumer_count=_ConsumerCount} = amqp_channel:call(Channel, QueueDeclare),
