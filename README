@@ -62,14 +62,32 @@ standard gen_server forms with the following:
 
 Example
 -------
-A simple implementation is in the test directory. The gen_qserver implementation
-illustrates the callback structure, while the test shows how to make calls
-(albeit in a not-recommended fashion).
+A simple implementation (my_qserver) is in the test directory. The gen_qserver
+implementation illustrates the callback structure, while the test shows how to 
+make calls (albeit in a not-recommended fashion).
 
 
 Using the gen_qfsm
 ==================
-Pending
+The queue-enabled FSM works like the regular gen_fsm except that it can listen
+to messages on the bus. Configuration is the same as the gen_qserver.
+Normal publish messages are treated as asynchronous calls (i.e. StateName/2)
+whereas RPC messages are dispatched to the synchronous calls (StateName/3).
+Any events that come from the bus are structured as
+  {<<RoutingKey/binary>>, Event}
+The corresponding Module:StateName will be called with this event, as in the
+standard gen_fsm.
+
+
+Limitations
+-----------
+Currently the send_all_state_event forms are not supported.
+
+Example
+-------
+A simple implementation, my_qfsm, is in the test directory. This implementation
+illustrates the callback structure, while the test shows how to make calls
+(albeit in a not-recommended fashion).
 
 
 Standalone Use
@@ -137,6 +155,15 @@ routing key.
   bunny_farm:rpc({get_value, key5}, ReplyTo, <<"request_route">>, BusHandle)
 
 
+Message Encoding
+================
+The default message encoding is BSON. To use erlang binaries instead, an
+explicit message needs to be passed to the publish function.
+
+  Message = #message{payload={set_value, key5, 5}, encoding=erlang}
+  bunny_farm:publish(Message, <<"routing_key">>, PubBus)
+
+RPCs are encoded by default as erlang binaries.
 
 
 Author

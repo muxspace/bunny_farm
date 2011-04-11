@@ -34,17 +34,17 @@ set_value_normal() ->
 
 get_value_queue() ->
   K = <<"gen_qserver_tests">>,
-  PubBus = bunny_farm:open(<<"exchange.two">>),
-  SubBus = bunny_farm:open(<<"exchange.sub">>, K),
+  PubBus = bunny_farm:open(<<"qserver.two">>),
+  SubBus = bunny_farm:open(<<"qserver.sub">>, K),
   bunny_farm:consume(SubBus),
   receive
     #'basic.consume_ok'{consumer_tag=ConsumerTag} -> ok
   end,
 
-  ReplyTo = <<"exchange.sub:gen_qserver_tests">>,
+  ReplyTo = <<"qserver.sub:gen_qserver_tests">>,
   bunny_farm:rpc({get_value, key3}, ReplyTo, <<"key">>, PubBus),
 
-  error_logger:info_msg("[gen_qserver_tests] Waiting for response"),
+  error_logger:info_msg("[gen_qserver_tests] Waiting for response~n"),
   receive
     {#'basic.deliver'{}, Content} ->
       Act = farm_tools:decode_payload(Content)
@@ -56,21 +56,25 @@ get_value_queue() ->
 
 
 set_value_queue() ->
+  error_logger:info_msg("[gen_qserver_tests] Opening connections~n"),
   K = <<"gen_qserver_tests">>,
-  PubBus = bunny_farm:open(<<"exchange.two">>),
-  SubBus = bunny_farm:open(<<"exchange.sub">>, K),
+  PubBus = bunny_farm:open(<<"qserver.two">>),
+  SubBus = bunny_farm:open(<<"qserver.sub">>, K),
+  error_logger:info_msg("[gen_qserver_tests] Consuming <<qserver.sub>>~n"),
   bunny_farm:consume(SubBus),
   receive
     #'basic.consume_ok'{consumer_tag=ConsumerTag} -> ok
   end,
 
+  error_logger:info_msg("[gen_qserver_tests] Sending set_value"),
   Message = #message{payload={set_value, key5, 5}, encoding=erlang},
   bunny_farm:publish(Message, <<"key">>, PubBus),
 
-  ReplyTo = <<"exchange.sub:gen_qserver_tests">>,
+  error_logger:info_msg("[gen_qserver_tests] Calling RPC to get_value"),
+  ReplyTo = <<"qserver.sub:gen_qserver_tests">>,
   bunny_farm:rpc({get_value, key5}, ReplyTo, <<"key">>, PubBus),
 
-  error_logger:info_msg("[gen_qserver_tests] Waiting for response"),
+  error_logger:info_msg("[gen_qserver_tests] Waiting for response~n"),
   receive
     {#'basic.deliver'{}, Content} ->
       Act = farm_tools:decode_payload(Content)
@@ -84,6 +88,6 @@ set_value_queue() ->
 get_connection() ->
   Conn = my_qserver:get_connection(),
   Handle = proplists:get_value(handle,Conn),
-  ?assertEqual(<<"exchange.two">>, proplists:get_value(id,Conn)),
+  ?assertEqual(<<"qserver.two">>, proplists:get_value(id,Conn)),
   ?assertEqual(bus_handle, element(1,Handle)).
 

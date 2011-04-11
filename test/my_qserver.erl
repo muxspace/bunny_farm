@@ -16,7 +16,7 @@ set_value(K,V) -> gen_qserver:cast(?MODULE, {set_value,K,V}).
 get_connection() -> gen_qserver:call(?MODULE, connection).
 
 start_link(TupleList) ->
-  ConnSpecs = [<<"exchange.one">>, {<<"exchange.two">>,<<"key">>}],
+  ConnSpecs = [<<"qserver.one">>, {<<"qserver.two">>,<<"key">>}],
   gen_qserver:start_link({local,?MODULE}, ?MODULE, TupleList, [], ConnSpecs).
 
 stop(Pid) ->
@@ -27,21 +27,29 @@ init(TupleList, CachePid) ->
   {ok, State}.
   
 %% This passes through RPC calls
-handle_call({<<_B/binary>>, Args}, From, State) ->
+handle_call({<<B/binary>>, Args}, From, State) ->
+  error_logger:info_msg("[my_qserver] Got publish ~p => ~p~n", [B,Args]),
   handle_call(Args, From, State);
 
 handle_call(connection, _From, State) ->
-  Conn = qcache:get_conn(State#state.cache_pid, <<"exchange.two">>),
+  Conn = qcache:get_conn(State#state.cache_pid, <<"qserver.two">>),
   {reply, Conn, State};
 
 handle_call({get_value,K}, _From, State) ->
   {reply, proplists:get_value(K,State#state.tuples), State}.
 
+
+handle_cast({<<B/binary>>, Args}, State) ->
+  error_logger:info_msg("[my_qserver] Got RPC ~p => ~p~n", [B,Args]),
+  handle_cast(Args, State);
+
 handle_cast({set_value,K,V}, State) ->
+  error_logger:info_msg("[my_qserver] Setting ~p = ~p~n", [K,V]),
   TupleList = lists:keystore(K,1,State#state.tuples, {K,V}),
   {noreply, State#state{tuples=TupleList}};
 
-handle_cast(_, State) ->
+handle_cast(A, State) ->
+  error_logger:info_msg("[my_qserver] Got unexpected cast: ~p~n", [A]),
   {noreply, State}.
 
 handle_info(_, State) ->

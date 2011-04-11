@@ -126,8 +126,8 @@ handle_info({#'basic.deliver'{routing_key=Key,exchange=OX}, Content}, State) ->
       {X,ReplyTo} = farm_tools:reply_to(Content, OX),
       BusHandle = bus(CachePid, {id,X}),
       ?info("Responding to ~p => ~p", [X,ReplyTo]),
+      ?info("Response = ~p", [Response]),
       bunny_farm:respond(Response, ReplyTo, BusHandle),
-      %error_logger:info_msg("[gen_qserver] Sent"),
       {noreply, NewState};
     _ ->
       handle_cast({Key,Payload}, State)
