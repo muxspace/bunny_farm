@@ -74,9 +74,9 @@ publish(Payload, #bus_handle{}=BusHandle) ->
 %% This is the recommended call to use as the same exchange can be reused
 publish(#message{payload=Payload, props=Props, encoding=Encoding},
         RoutingKey, #bus_handle{exchange=X, channel=Channel}) ->
-  Payload = farm_tools:encode_payload(Encoding, Payload),
-  ?verbose("Publish:~n  ~p", [Payload]),
-  AMsg = #amqp_msg{payload=Payload,
+  EncPayload = farm_tools:encode_payload(Encoding, Payload),
+  ?verbose("Publish:~n  ~p", [EncPayload]),
+  AMsg = #amqp_msg{payload=EncPayload,
                    props=farm_tools:to_amqp_props(Props)},
   BasicPublish = #'basic.publish'{exchange=X, routing_key=RoutingKey}, 
   amqp_channel:cast(Channel, BasicPublish, AMsg);
