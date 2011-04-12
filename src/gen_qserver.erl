@@ -119,6 +119,7 @@ handle_info(#'basic.consume_ok'{consumer_tag=Tag}, State) ->
 % Handle messages coming off the bus
 handle_info({#'basic.deliver'{routing_key=Key,exchange=OX}, Content}, State) ->
   CachePid = State#gen_qstate.cache_pid,
+  ?verbose("Message:~n  ~p", [Content]),
   Payload = farm_tools:decode_payload(Content),
   case farm_tools:is_rpc(Content) of
     true -> 
