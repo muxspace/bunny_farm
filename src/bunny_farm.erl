@@ -157,7 +157,7 @@ bind(X, Q, BindKey, BusHandle) when is_record(BusHandle,bus_handle) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PRIVATE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 open_it(#bus_handle{}=BusHandle) ->
-  Keys = [username, password, virtual_host, host, port],
+  Keys = [amqp_username, amqp_password,amqp_virtual_host, amqp_host,amqp_port],
   [U,P,V,H,R] = lists:map(fun get_env/1, Keys),
   Params = #amqp_params{username=U, password=P, virtual_host=V,
              host=H, port=R},
@@ -170,16 +170,16 @@ open_it(Method, #amqp_params{}=Params, #bus_handle{}=BusHandle) ->
 
 
 default(Key) ->
-  D = [ {username, <<"guest">>},
-        {password, <<"guest">>},
-        {virtual_host, <<"/">>},
-        {host, "localhost"},
-        {port, 5672} ],
+  D = [ {amqp_username, <<"guest">>},
+        {amqp_password, <<"guest">>},
+        {amqp_virtual_host, <<"/">>},
+        {amqp_host, "localhost"},
+        {amqp_port, 5672} ],
   proplists:get_value(Key,D).
 
 get_env(Key) ->
   Default = default(Key),
-  case application:get_env(bunny_farm, Key) of
+  case application:get_env(Key) of
     undefined -> ?info("Using default ~p ~p", [Key,Default]), Default;
     {ok,H} -> H
   end.

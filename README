@@ -169,15 +169,14 @@ RPCs are encoded by default as erlang binaries.
 Connection Configuration
 ========================
 The connection information for the RabbitMQ server can be set in the application
-configuration file. The following variables are currently supported.
+configuration file. The following variables are currently supported and can be
+added to the parameter list of your application.
 
-{bunny_farm, [
-  {username, <<"guest">>},
-  {password, <<"guest">>},
-  {virtual_host, <<"/">>},
-  {host, "localhost"},
-  {port, "5672"}
-]}
+  {amqp_username, <<"guest">>},
+  {amqp_password, <<"guest">>},
+  {amqp_virtual_host, <<"/">>},
+  {amqp_host, "localhost"},
+  {amqp_port, "5672"}
 
 
 Author
