@@ -7,6 +7,9 @@
   bind/4]).
 -export([consume/1, consume/2, publish/2, publish/3, 
   rpc/3, rpc/4, respond/3]).
+-ifdef(TEST).
+-compile(export_all).
+-endif.
 
 %% Convenience function for opening a connection for publishing 
 %% messages. The routing key can be included but if it is not,
@@ -154,10 +157,31 @@ bind(X, Q, BindKey, BusHandle) when is_record(BusHandle,bus_handle) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PRIVATE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 open_it(#bus_handle{}=BusHandle) ->
-  open_it(network, #amqp_params{}, BusHandle).
+  Keys = [username, password, virtual_host, host, port],
+  [U,P,V,H,R] = lists:map(fun get_env/1, Keys),
+  Params = #amqp_params{username=U, password=P, virtual_host=V,
+             host=H, port=R},
+  open_it(network, Params, BusHandle).
 
 open_it(Method, #amqp_params{}=Params, #bus_handle{}=BusHandle) ->
   {ok,Connection} = amqp_connection:start(Method, Params),
   {ok,Channel} = amqp_connection:open_channel(Connection),
   BusHandle#bus_handle{channel=Channel, conn=Connection}.
+
+
+default(Key) ->
+  D = [ {username, <<"guest">>},
+        {password, <<"guest">>},
+        {virtual_host, <<"/">>},
+        {host, "localhost"},
+        {port, 5672} ],
+  proplists:get_value(Key,D).
+
+get_env(Key) ->
+  Default = default(Key),
+  case application:get_env(bunny_farm, Key) of
+    undefined -> ?info("Using default ~p ~p", [Key,Default]), Default;
+    {ok,H} -> H
+  end.
+
 

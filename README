@@ -166,6 +166,21 @@ explicit message needs to be passed to the publish function.
 RPCs are encoded by default as erlang binaries.
 
 
+Connection Configuration
+========================
+The connection information for the RabbitMQ server can be set in the application
+configuration file. The following variables are currently supported.
+
+{bunny_farm, [
+  {username, <<"guest">>},
+  {password, <<"guest">>},
+  {virtual_host, <<"/">>},
+  {host, "localhost"},
+  {port, "5672"}
+]}
+
+
 Author
+======
 Brian Lee Yung Rowe
 

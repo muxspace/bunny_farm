@@ -1,7 +1,7 @@
 {application, bunny_farm,
  [
   {description, ""},
-  {vsn, "1.1.0"},
+  {vsn, "1.2.0"},
   {modules, [bunny_farm, farm_tools, gen_qserver, qcache]},
   {registered, []},
   {applications, [
