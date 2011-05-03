@@ -6,7 +6,7 @@
 -export([to_list/1, atomize/1, atomize/2, listify/1, listify/2]).
 -export([binarize/1]).
 -export([to_queue_declare/1, to_amqp_props/1, to_basic_consume/1,
-  is_rpc/1, reply_to/2]).
+  is_rpc/1, reply_to/1, reply_to/2, content_type/1]).
 
 %% Properties is a 'P_basic' record. We convert it back to a tuple
 %% list
@@ -15,11 +15,15 @@ decode_properties(#amqp_msg{props=Properties}) ->
   Ks = record_info(fields,'P_basic'),
   lists:zip(Ks,Vs).
 
-decode_payload(#amqp_msg{payload=Payload}) ->
-  decode_payload(Payload);
+decode_payload(#amqp_msg{payload=Payload}=Content) ->
+  decode_payload(content_type(Content), Payload);
   
 decode_payload(Payload) -> decode_payload(bson, Payload).
+decode_payload(<<"application/x-erlang">>, Payload) ->
+  decode_payload(erlang, Payload);
 decode_payload(erlang, Payload) -> binary_to_term(Payload);
+decode_payload(<<"application/bson">>, Payload) ->
+  decode_payload(bson, Payload);
 decode_payload(bson, Payload) ->
   try
     {Doc,_Bin} = bson_binary:get_document(Payload),
@@ -30,9 +34,15 @@ decode_payload(bson, Payload) ->
   end.
 
 encode_payload(Payload) -> encode_payload(bson, Payload).
+encode_payload(<<"application/x-erlang">>, Payload) ->
+  encode_payload(erlang, Payload);
 encode_payload(erlang, Payload) -> term_to_binary(Payload);
+encode_payload(<<"application/bson">>, Payload) ->
+  encode_payload(bson, Payload);
+encode_payload(bson, Payload) when is_list(Payload) ->
+  bson_binary:put_document(bson:document(Payload));
 encode_payload(bson, Payload) ->
-  bson_binary:put_document(bson:document(Payload)).
+  bson_binary:put_document(bson:document([Payload])).
 
 %% Convert types to strings
 to_list(Binary) when is_binary(Binary) -> binary_to_list(Binary);
@@ -115,11 +125,24 @@ is_rpc(#amqp_msg{props=Props}) ->
 %% colon (:) is found as a separator. Otherwise, the existing exchange
 %% will be used.
 -spec reply_to(#amqp_msg{}, binary()) -> binary().
-reply_to(Content, SourceX) ->
+reply_to(#amqp_msg{}=Content, _SourceX) -> reply_to(Content).
+
+-spec reply_to(#amqp_msg{}) -> binary().
+reply_to(#amqp_msg{}=Content) ->
   Props = farm_tools:decode_properties(Content),
   Parts = binary:split(proplists:get_value(reply_to, Props), <<":">>),
   case Parts of
     [X,K] -> {X,K};
-    [K] -> {SourceX,K}
+    [K] -> {<<"">>,K}
+  end.
+
+-spec content_type(#amqp_msg{}) -> binary().
+content_type(#amqp_msg{}=Content) ->
+  content_type(farm_tools:decode_properties(Content));
+
+content_type(Props) when is_list(Props) ->
+  case proplists:get_value(content_type,Props) of
+    undefined -> <<"application/x-erlang">>;
+    T -> T
   end.
 

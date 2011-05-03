@@ -223,7 +223,7 @@ handle_info(#'basic.consume_ok'{consumer_tag=Tag}, static_state, State) ->
   {next_state, static_state, State};
 
 % Handle messages coming off the bus
-handle_info({#'basic.deliver'{routing_key=Key,exchange=OX}, Content},
+handle_info({#'basic.deliver'{routing_key=Key}, Content},
               static_state, State) ->
   CachePid = State#gen_qstate.cache_pid,
   Payload = farm_tools:decode_payload(Content),
@@ -231,10 +231,12 @@ handle_info({#'basic.deliver'{routing_key=Key,exchange=OX}, Content},
     true -> 
       {reply,Response, _, MState} =
         static_state({Key, Payload}, self(), State),
-      {X,ReplyTo} = farm_tools:reply_to(Content, OX),
+      {X,ReplyTo} = farm_tools:reply_to(Content),
       BusHandle = bus(CachePid, {id,X}),
       ?info("Responding to ~p => ~p", [X,ReplyTo]),
-      bunny_farm:respond(Response, ReplyTo, BusHandle),
+      Props = [ {content_type, farm_tools:content_type(Content)} ],
+      Msg = #message{payload=Response, props=Props},
+      bunny_farm:respond(Msg, ReplyTo, BusHandle),
       %error_logger:info_msg("[gen_qfsm] Sent"),
       {next_state, static_state, MState};
     _ ->

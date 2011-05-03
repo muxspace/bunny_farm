@@ -75,9 +75,10 @@ publish(Payload, #bus_handle{}=BusHandle) ->
   publish(#message{payload=Payload}, BusHandle).
 
 %% This is the recommended call to use as the same exchange can be reused
-publish(#message{payload=Payload, props=Props, encoding=Encoding},
+publish(#message{payload=Payload, props=Props},
         RoutingKey, #bus_handle{exchange=X, channel=Channel}) ->
-  EncPayload = farm_tools:encode_payload(Encoding, Payload),
+  MimeType = farm_tools:content_type(Props),
+  EncPayload = farm_tools:encode_payload(MimeType, Payload),
   ?verbose("Publish:~n  ~p", [EncPayload]),
   AMsg = #amqp_msg{payload=EncPayload,
                    props=farm_tools:to_amqp_props(Props)},
@@ -91,17 +92,19 @@ publish(Payload, RoutingKey, #bus_handle{}=BusHandle) ->
 
 rpc(#message{payload=Payload, props=Props}, K,
     #bus_handle{exchange=X, channel=Channel}) ->
-  AMsg = #amqp_msg{payload=farm_tools:encode_payload(erlang,Payload),
+  MimeType = farm_tools:content_type(Props),
+  AMsg = #amqp_msg{payload=farm_tools:encode_payload(MimeType,Payload),
                    props=farm_tools:to_amqp_props(Props)},
   BasicPublish = #'basic.publish'{exchange=X, routing_key=K}, 
   amqp_channel:cast(Channel, BasicPublish, AMsg).
 
-rpc(Payload, ReplyTo, K, #bus_handle{exchange=X, channel=Channel}) ->
+rpc(Payload, ReplyTo, K, BusHandle) ->
   Props = [{reply_to,ReplyTo}, {correlation_id,ReplyTo}],
-  AMsg = #amqp_msg{payload=farm_tools:encode_payload(erlang,Payload),
-                   props=farm_tools:to_amqp_props(Props)},
-  BasicPublish = #'basic.publish'{exchange=X, routing_key=K}, 
-  amqp_channel:cast(Channel, BasicPublish, AMsg).
+  rpc(#message{payload=Payload, props=Props}, K, BusHandle).
+  %AMsg = #amqp_msg{payload=farm_tools:encode_payload(erlang,Payload),
+  %                 props=farm_tools:to_amqp_props(Props)},
+  %BasicPublish = #'basic.publish'{exchange=X, routing_key=K}, 
+  %amqp_channel:cast(Channel, BasicPublish, AMsg).
 
 
 %% This is used to send the response of an RPC. The primary difference 
@@ -109,7 +112,8 @@ rpc(Payload, ReplyTo, K, #bus_handle{exchange=X, channel=Channel}) ->
 %% binary.
 respond(#message{payload=Payload, props=Props}, RoutingKey,
         #bus_handle{exchange=X,channel=Channel}) ->
-  AMsg = #amqp_msg{payload=farm_tools:encode_payload(erlang,Payload),
+  MimeType = farm_tools:content_type(Props),
+  AMsg = #amqp_msg{payload=farm_tools:encode_payload(MimeType,Payload),
                    props=farm_tools:to_amqp_props(Props)},
   BasicPublish = #'basic.publish'{exchange=X, routing_key=RoutingKey}, 
   amqp_channel:cast(Channel, BasicPublish, AMsg);
@@ -120,10 +124,14 @@ respond(Payload, RoutingKey, #bus_handle{}=BusHandle) ->
 
 
 %% Type - The exchange type (e.g. <<"topic">>)
+declare_exchange(_Type, #bus_handle{exchange= <<"">>}) -> ok;
+
 declare_exchange(Type, #bus_handle{exchange=Key, channel=Channel}) ->
   ExchDeclare = #'exchange.declare'{exchange=Key, type=Type},
   #'exchange.declare_ok'{} = amqp_channel:call(Channel, ExchDeclare),
   ok.
+
+declare_exchange(_Type, <<"">>, #bus_handle{}) -> ok;
 
 declare_exchange(Type, Key, #bus_handle{channel=Channel}) ->
   ExchDeclare = #'exchange.declare'{exchange=Key, type=Type},

@@ -28,6 +28,12 @@ bson_simple_test() ->
   Decoded = farm_tools:decode_payload(bson, Encoded),
   TupleList = Decoded.
 
+bson_plain_tuple() ->
+  Tuple = {fruit, pear},
+  Encoded = farm_tools:encode_payload(Tuple),
+  Decoded = farm_tools:decode_payload(bson, Encoded),
+  [Tuple] = Decoded.
+
 bson_decode_test() ->
   TupleList = [ {fruit, pear}, {grain, barley} ],
   Encoded = farm_tools:encode_payload(erlang, TupleList),
