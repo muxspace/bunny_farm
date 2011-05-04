@@ -6,7 +6,7 @@
 -export([to_list/1, atomize/1, atomize/2, listify/1, listify/2]).
 -export([binarize/1]).
 -export([to_queue_declare/1, to_amqp_props/1, to_basic_consume/1,
-  is_rpc/1, reply_to/1, reply_to/2, content_type/1]).
+  is_rpc/1, reply_to/1, reply_to/2, content_type/1, correlation_id/1 ]).
 
 %% Properties is a 'P_basic' record. We convert it back to a tuple
 %% list
@@ -136,13 +136,35 @@ reply_to(#amqp_msg{}=Content) ->
     [K] -> {<<"">>,K}
   end.
 
+
+-spec correlation_id(#amqp_msg{}) -> binary().
+correlation_id(#amqp_msg{}=Content) ->
+  correlation_id(farm_tools:decode_properties(Content));
+
+correlation_id(Props) when is_list(Props) ->
+  p(correlation_id, Props, undefined).
+
 -spec content_type(#amqp_msg{}) -> binary().
 content_type(#amqp_msg{}=Content) ->
   content_type(farm_tools:decode_properties(Content));
 
 content_type(Props) when is_list(Props) ->
-  case proplists:get_value(content_type,Props) of
-    undefined -> <<"application/x-erlang">>;
-    T -> T
-  end.
+  p(content_type, Props, <<"application/x-erlang">>).
 
+
+p(P, #amqp_msg{}=Content) ->
+  p(P, farm_tools:decode_properties(Content), undefined);
+
+p(P, Props) when is_list(Props) ->
+  p(P, Props, undefined).
+
+p(P, #amqp_msg{}=Content, Default) ->
+  p(P, farm_tools:decode_properties(Content), Default);
+
+%% This construction is used because sometimes the value is set to undefined,
+%% and we want to change these to the default in addition to undefined values.
+p(P, Props, Default) when is_list(Props) ->
+  case proplists:get_value(P, Props) of
+    undefined -> Default;
+    V -> V
+  end.
