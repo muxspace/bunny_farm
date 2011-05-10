@@ -5,8 +5,12 @@
   encode_payload/1, encode_payload/2]).
 -export([to_list/1, atomize/1, atomize/2, listify/1, listify/2]).
 -export([binarize/1]).
--export([to_queue_declare/1, to_amqp_props/1, to_basic_consume/1,
-  is_rpc/1, reply_to/1, reply_to/2, content_type/1, correlation_id/1 ]).
+-export([to_exchange_declare/1,
+         to_queue_declare/1,
+         to_amqp_props/1,
+         to_basic_consume/1,
+         is_rpc/1,
+         reply_to/1, reply_to/2, content_type/1, correlation_id/1 ]).
 
 %% Properties is a 'P_basic' record. We convert it back to a tuple
 %% list
@@ -81,16 +85,20 @@ binarize(List) when is_list(List) ->
 binarize(Other) -> list_to_binary(to_list(Other)).
 
 %% Converts a tuple list of values to a queue.declare record
+-spec to_exchange_declare([{atom(), term()}]) -> #'exchange.declare'{}.
+to_exchange_declare(Props) ->
+  %% This is a safety in case certain arguments aren't set elsewhere
+  Defaults = [ {ticket,0}, {arguments,[]} ],
+  Enriched = lists:merge(Props, Defaults),
+  list_to_tuple(['exchange.declare'|[proplists:get_value(X,Enriched,false) || 
+    X <- record_info(fields,'exchange.declare')]]).
+
+%% Converts a tuple list of values to a queue.declare record
 -spec to_queue_declare([{atom(), term()}]) -> #'queue.declare'{}.
 to_queue_declare(Props) ->
+  %% This is a safety in case certain arguments aren't set elsewhere
   Defaults = [ {ticket,0}, {arguments,[]} ],
-  Fn = fun(X, Acc) -> 
-    case proplists:is_defined(X, Acc) of
-      false -> Acc ++ [ {K,V} || {K,V} <- Defaults, K = X ];
-      _ -> Acc
-    end
-  end,
-  Enriched = lists:foldl(Fn, Props, [K || {K,_} <- Defaults]),
+  Enriched = lists:merge(Props, Defaults),
   list_to_tuple(['queue.declare'|[proplists:get_value(X,Enriched,false) || 
     X <- record_info(fields,'queue.declare')]]).
 
@@ -98,13 +106,7 @@ to_queue_declare(Props) ->
 -spec to_basic_consume([{atom(), term()}]) -> #'basic.consume'{}.
 to_basic_consume(Props) ->
   Defaults = [ {ticket,0}, {arguments,[]}, {consumer_tag,<<"">>} ],
-  Fn = fun(X, Acc) -> 
-    case proplists:is_defined(X, Acc) of
-      false -> Acc ++ [ {K,V} || {K,V} <- Defaults, K == X ];
-      _ -> Acc
-    end
-  end,
-  Enriched = lists:foldl(Fn, Props, [K || {K,_} <- Defaults]),
+  Enriched = lists:merge(Props, Defaults),
   list_to_tuple(['basic.consume'|[proplists:get_value(X,Enriched,false) || 
     X <- record_info(fields,'basic.consume')]]).
 
@@ -142,14 +144,14 @@ correlation_id(#amqp_msg{}=Content) ->
   correlation_id(farm_tools:decode_properties(Content));
 
 correlation_id(Props) when is_list(Props) ->
-  p(correlation_id, Props, undefined).
+  p(correlation_id, Props).
 
 -spec content_type(#amqp_msg{}) -> binary().
 content_type(#amqp_msg{}=Content) ->
   content_type(farm_tools:decode_properties(Content));
 
 content_type(Props) when is_list(Props) ->
-  p(content_type, Props, <<"application/x-erlang">>).
+  p(content_type, Props).
 
 
 p(P, #amqp_msg{}=Content) ->

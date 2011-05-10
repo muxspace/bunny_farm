@@ -2,7 +2,7 @@
 -define(BUNNY_FARM_HRL, true).
 
 -include_lib("amqp_client/include/amqp_client.hrl").
--record(bus_handle, {exchange, queue, routing_key, channel, conn}).
+-record(bus_handle, {exchange, queue, routing_key, channel, conn, options=[]}).
 
 %% This is only used for publishing messages. It gets converted to
 %% an AMQP message when sending over the wire.

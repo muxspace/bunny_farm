@@ -1,10 +1,10 @@
 -module(bunny_farm).
 -include("bunny_farm.hrl").
 -include("private_macros.hrl").
--export([open/1, open/2, open/3, close/1, close/2]).
--export([declare_exchange/2, declare_exchange/3,
+-export([open/1, open/2, close/1, close/2]).
+-export([declare_exchange/1, declare_exchange/2,
   declare_queue/1, declare_queue/2, declare_queue/3,
-  bind/4]).
+  bind/3]).
 -export([consume/1, consume/2, publish/2, publish/3, 
   rpc/3, rpc/4, respond/3]).
 -ifdef(TEST).
@@ -18,9 +18,10 @@
 %% Example
 %%   BusHandle = bunny_farm:open(<<"my.exchange">>),
 %%   bunny_farm:publish(Message, K,BusHandle),
-open(X) ->
-  BusHandle = open_it(#bus_handle{exchange=X}),
-  bunny_farm:declare_exchange(<<"topic">>, BusHandle),
+open(MaybeTuple) ->
+  {X,XO} = resolve_options(exchange, MaybeTuple),
+  BusHandle = open_it(#bus_handle{exchange=X, options=XO}),
+  bunny_farm:declare_exchange(BusHandle),
   BusHandle.
 
 %% Convenience function to open and declare all intermediate objects. This
@@ -29,17 +30,14 @@ open(X) ->
 %% Example
 %%   BusHandle = bunny_farm:open(X, K),
 %%   bunny_farm:consume(BusHandle),
-open(X, K) -> open(X, K, []).
+open(MaybeX, MaybeK) ->
+  {X,XO} = resolve_options(exchange, MaybeX),
+  {K,KO} = resolve_options(queue, MaybeK),
 
-open(X, Key, Options) when is_list(Options) ->
-  Defaults = [{exclusive,true}],
-  Fn = fun({K,V},Acc) -> lists:keystore(K,1,Acc,{K,V}) end,
-  AllOptions = lists:foldl(Fn, Defaults, Options),
-
-  BusHandle = open_it(#bus_handle{exchange=X}),
-  bunny_farm:declare_exchange(<<"topic">>, BusHandle),
-  Q = bunny_farm:declare_queue(BusHandle, AllOptions),
-  bunny_farm:bind(X,Q, Key, BusHandle).
+  BusHandle = open_it(#bus_handle{exchange=X, options=XO}),
+  bunny_farm:declare_exchange(BusHandle),
+  Q = bunny_farm:declare_queue(BusHandle, KO),
+  bunny_farm:bind(Q, K, BusHandle).
 
 
 close(#bus_handle{channel=Channel, conn=Connection}) ->
@@ -75,14 +73,18 @@ publish(Payload, #bus_handle{}=BusHandle) ->
   publish(#message{payload=Payload}, BusHandle).
 
 %% This is the recommended call to use as the same exchange can be reused
-publish(#message{payload=Payload, props=Props},
-        RoutingKey, #bus_handle{exchange=X, channel=Channel}) ->
-  MimeType = farm_tools:content_type(Props),
+publish(#message{payload=Payload, props=Props}, K,
+        #bus_handle{exchange=X, channel=Channel, options=Options}) ->
+  MimeType = case farm_tools:content_type(Props) of
+    undefined -> proplists:get_value(encoding, Options);
+    M -> M
+  end,
   EncPayload = farm_tools:encode_payload(MimeType, Payload),
   ?verbose("Publish:~n  ~p", [EncPayload]),
-  AMsg = #amqp_msg{payload=EncPayload,
-                   props=farm_tools:to_amqp_props(Props)},
-  BasicPublish = #'basic.publish'{exchange=X, routing_key=RoutingKey}, 
+  ContentType = {content_type,MimeType},
+  AProps = farm_tools:to_amqp_props(lists:merge([ContentType], Props)),
+  AMsg = #amqp_msg{payload=EncPayload, props=AProps},
+  BasicPublish = #'basic.publish'{exchange=X, routing_key=K}, 
   amqp_channel:cast(Channel, BasicPublish, AMsg);
 
 publish(Payload, RoutingKey, #bus_handle{}=BusHandle) ->
@@ -91,20 +93,21 @@ publish(Payload, RoutingKey, #bus_handle{}=BusHandle) ->
 
 
 rpc(#message{payload=Payload, props=Props}, K,
-    #bus_handle{exchange=X, channel=Channel}) ->
-  MimeType = farm_tools:content_type(Props),
+    #bus_handle{exchange=X, channel=Channel, options=Options}) ->
+  MimeType = case farm_tools:content_type(Props) of
+    undefined -> proplists:get_value(encoding, Options);
+    M -> M
+  end,
+  ContentType = {content_type,MimeType},
+  AProps = farm_tools:to_amqp_props(lists:merge([ContentType], Props)),
   AMsg = #amqp_msg{payload=farm_tools:encode_payload(MimeType,Payload),
-                   props=farm_tools:to_amqp_props(Props)},
+                   props=AProps},
   BasicPublish = #'basic.publish'{exchange=X, routing_key=K}, 
   amqp_channel:cast(Channel, BasicPublish, AMsg).
 
 rpc(Payload, ReplyTo, K, BusHandle) ->
   Props = [{reply_to,ReplyTo}, {correlation_id,ReplyTo}],
   rpc(#message{payload=Payload, props=Props}, K, BusHandle).
-  %AMsg = #amqp_msg{payload=farm_tools:encode_payload(erlang,Payload),
-  %                 props=farm_tools:to_amqp_props(Props)},
-  %BasicPublish = #'basic.publish'{exchange=X, routing_key=K}, 
-  %amqp_channel:cast(Channel, BasicPublish, AMsg).
 
 
 %% This is used to send the response of an RPC. The primary difference 
@@ -123,42 +126,42 @@ respond(Payload, RoutingKey, #bus_handle{}=BusHandle) ->
 
 
 
+%% This is special handling for the default exchange. This exchange cannot be
+%% explicitly declared so it just returns.
+declare_exchange(#bus_handle{exchange= <<"">>}) -> ok;
+
 %% Type - The exchange type (e.g. <<"topic">>)
-declare_exchange(_Type, #bus_handle{exchange= <<"">>}) -> ok;
-
-declare_exchange(Type, #bus_handle{exchange=Key, channel=Channel}) ->
-  ExchDeclare = #'exchange.declare'{exchange=Key, type=Type},
+declare_exchange(#bus_handle{exchange=Key, channel=Channel, options=Options}) ->
+  AllOptions = lists:merge([{exchange,Key}], Options),
+  ExchDeclare = farm_tools:to_exchange_declare(AllOptions),
+  ?info("Declaring exchange: ~p", [ExchDeclare]),
   #'exchange.declare_ok'{} = amqp_channel:call(Channel, ExchDeclare),
   ok.
 
-declare_exchange(_Type, <<"">>, #bus_handle{}) -> ok;
+declare_exchange(<<"">>, #bus_handle{}) -> ok;
 
-declare_exchange(Type, Key, #bus_handle{channel=Channel}) ->
-  ExchDeclare = #'exchange.declare'{exchange=Key, type=Type},
-  #'exchange.declare_ok'{} = amqp_channel:call(Channel, ExchDeclare),
-  ok.
+declare_exchange(Key, #bus_handle{}=BusHandle) ->
+  declare_exchange(BusHandle#bus_handle{exchange=Key}).
+
+%% http://www.rabbitmq.com/amqp-0-9-1-quickref.html
+%% Use configured options for the queue. Since no routing key is specified, 
+%% attempt to read options for the routing key <<"">>.
+declare_queue(#bus_handle{}=BusHandle) ->
+  declare_queue(BusHandle, queue_options(<<"">>)).
 
 %% Options - Tuple list of k,v options
-%% http://www.rabbitmq.com/amqp-0-9-1-quickref.html
-declare_queue(#bus_handle{}=BusHandle) ->
-  declare_queue(BusHandle, []).
-
-declare_queue(#bus_handle{}=BusHandle, Options) ->
+declare_queue(#bus_handle{}=BusHandle, Options) when is_list(Options) ->
   declare_queue(<<"">>, BusHandle, Options).
 
 declare_queue(Key, #bus_handle{channel=Channel}, Options) ->
-  Defaults = [{queue,Key}, {ticket,0}, {arguments,[]}],
-  Fn = fun({K,V},Acc) -> lists:keystore(K,1,Acc,{K,V}) end,
-  AllOptions = lists:foldl(Fn, Defaults, Options),
+  AllOptions = lists:merge([{queue,Key}], Options),
   QueueDeclare = farm_tools:to_queue_declare(AllOptions),
-  #'queue.declare_ok'{queue=Q, message_count=_OrderCount,
-      consumer_count=_ConsumerCount} = amqp_channel:call(Channel, QueueDeclare),
+  #'queue.declare_ok'{queue=Q} = amqp_channel:call(Channel, QueueDeclare),
   Q.
 
 
   
-bind(X, Q, BindKey, BusHandle) when is_record(BusHandle,bus_handle) ->
-  Channel = BusHandle#bus_handle.channel,
+bind(Q, BindKey, #bus_handle{exchange=X, channel=Channel}=BusHandle) ->
   QueueBind = #'queue.bind'{exchange=X, queue=Q, routing_key=BindKey},
   #'queue.bind_ok'{} = amqp_channel:call(Channel, QueueBind),
   BusHandle#bus_handle{queue=Q}.
@@ -182,7 +185,10 @@ default(Key) ->
         {amqp_password, <<"guest">>},
         {amqp_virtual_host, <<"/">>},
         {amqp_host, "localhost"},
-        {amqp_port, 5672} ],
+        {amqp_port, 5672},
+        {amqp_encoding, <<"application/x-erlang">>},
+        {amqp_exchanges, []},
+        {amqp_queues, []} ],
   proplists:get_value(Key,D).
 
 get_env(Key) ->
@@ -191,5 +197,48 @@ get_env(Key) ->
     undefined -> ?info("Using default ~p ~p", [Key,Default]), Default;
     {ok,H} -> H
   end.
+
+%% Define defaults that override rabbitmq defaults
+exchange_defaults() ->
+  Encoding = get_env(amqp_encoding),
+  lists:sort([ {encoding, Encoding}, {type,<<"topic">>} ]).
+
+%% Get the proplist for a given channel
+exchange_options(X) ->
+  Channels = get_env(amqp_exchanges),
+  ChannelList = [ List || {K, List} <- Channels, K == X ],
+  case ChannelList of
+    [] -> [];
+    [Channel] -> lists:sort(Channel)
+  end.
+
+%% Define defaults that override rabbitmq defaults
+queue_defaults() ->
+  lists:sort([ {exclusive,true} ]).
+
+queue_options(X) ->
+  Channels = get_env(amqp_queues),
+  ChannelList = [ List || {K, List} <- Channels, K == X ],
+  case ChannelList of
+    [] -> [];
+    [Channel] -> lists:sort(Channel)
+  end.
+
+%% Decouple the exchange and options. If no options exist, then use defaults.
+resolve_options(exchange, MaybeTuple) ->
+  Defaults = exchange_defaults(),
+  case MaybeTuple of
+    {X,O} -> Os = lists:merge([lists:sort(O),exchange_options(X),Defaults]);
+    X -> Os = lists:merge([exchange_options(X),Defaults])
+  end,
+  {X,Os};
+
+resolve_options(queue, MaybeTuple) ->
+  Defaults = queue_defaults(),
+  case MaybeTuple of
+    {K,O} -> Os = lists:merge([lists:sort(O),queue_options(K),Defaults]);
+    K -> Os = lists:merge(queue_options(K),Defaults)
+  end,
+  {K,Os}.
 
 
