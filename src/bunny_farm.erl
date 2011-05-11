@@ -5,7 +5,8 @@
 -export([declare_exchange/1, declare_exchange/2,
   declare_queue/1, declare_queue/2, declare_queue/3,
   bind/3]).
--export([consume/1, consume/2, publish/2, publish/3, 
+-export([consume/1, consume/2,
+  publish/3, 
   rpc/3, rpc/4, respond/3]).
 -ifdef(TEST).
 -compile(export_all).
@@ -36,10 +37,14 @@ open(MaybeX, MaybeK) ->
 
   BusHandle = open_it(#bus_handle{exchange=X, options=XO}),
   bunny_farm:declare_exchange(BusHandle),
-  Q = bunny_farm:declare_queue(BusHandle, KO),
+  case X of
+    <<"">> -> Q = bunny_farm:declare_queue(K, BusHandle, KO);
+    _ -> Q = bunny_farm:declare_queue(BusHandle, KO)
+  end,
   bunny_farm:bind(Q, K, BusHandle).
 
 
+close(#bus_handle{exchange = <<"">>}) -> ok;
 close(#bus_handle{channel=Channel, conn=Connection}) ->
   amqp_channel:close(Channel),
   amqp_connection:close(Connection).
@@ -47,12 +52,10 @@ close(#bus_handle{channel=Channel, conn=Connection}) ->
 close(#bus_handle{}=BusHandle, <<"">>) ->
   close(BusHandle);
 
-close(#bus_handle{channel=Channel, conn=Connection}, Tag) ->
+close(#bus_handle{channel=Channel}=BusHandle, Tag) ->
   #'basic.cancel_ok'{} =
     amqp_channel:call(Channel, #'basic.cancel'{consumer_tag=Tag}),
-  ok = amqp_channel:close(Channel),
-  ok = amqp_connection:close(Connection),
-  ok.
+  close(BusHandle).
 
 
 
@@ -66,11 +69,11 @@ consume(#bus_handle{queue=Q,channel=Channel}, Options) when is_list(Options) ->
   amqp_channel:subscribe(Channel, BasicConsume, self()).
 
 
-publish(#message{}=Message, #bus_handle{}=BusHandle) ->
-  publish(Message, BusHandle#bus_handle.routing_key, BusHandle);
+%publish(#message{}=Message, #bus_handle{}=BusHandle) ->
+%  publish(Message, BusHandle#bus_handle.routing_key, BusHandle);
 
-publish(Payload, #bus_handle{}=BusHandle) ->
-  publish(#message{payload=Payload}, BusHandle).
+%publish(Payload, #bus_handle{}=BusHandle) ->
+%  publish(#message{payload=Payload}, BusHandle).
 
 %% This is the recommended call to use as the same exchange can be reused
 publish(#message{payload=Payload, props=Props}, K,
@@ -161,6 +164,9 @@ declare_queue(Key, #bus_handle{channel=Channel}, Options) ->
 
 
   
+bind(Q, _BindKey, #bus_handle{exchange= <<"">>}=BusHandle) ->
+  BusHandle#bus_handle{queue=Q};
+
 bind(Q, BindKey, #bus_handle{exchange=X, channel=Channel}=BusHandle) ->
   QueueBind = #'queue.bind'{exchange=X, queue=Q, routing_key=BindKey},
   #'queue.bind_ok'{} = amqp_channel:call(Channel, QueueBind),

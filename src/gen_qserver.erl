@@ -49,30 +49,30 @@ bus(CachePid, {id,X}) ->
     BH -> BH
   end.
 
-%% Consume
--spec connect({exchange(), routing_key()}) -> [ {exchange(), boolean(), bus_handle()} ].
-connect({<<Exchange/binary>>, <<Key/binary>>}) ->
-  ?info("Opening ~p => ~p for consuming", [Exchange,Key]),
-  Handle = bunny_farm:open(Exchange,Key),
+%% Publish with options
+%-spec connect({maybe_binary(), maybe_binary()}) -> [tuple()].
+connect({<<X/binary>>, Options}) when is_list(Options) ->
+  ?info("Opening ~p for publishing with options ~p", [X,Options]),
+  Handle = bunny_farm:open({X,Options}),
+  %error_logger:info_msg("[gen_qserver] Returning handle spec"),
+  [{id,X}, {tag,<<"">>}, {active,true}, {handle,Handle}];
+
+%% Consume with maybe options
+connect({MaybeX, MaybeK}) ->
+  ?info("Opening ~p => ~p for consuming", [MaybeX,MaybeK]),
+  Handle = bunny_farm:open(MaybeX,MaybeK),
   Tag = tag(),
   bunny_farm:consume(Handle, [{consumer_tag,Tag}]),
+  Exchange = case MaybeX of
+    {Exch,_Os} -> Exch;
+    Exch -> Exch
+  end,
   %error_logger:info_msg("[gen_qserver] Returning handle spec"),
   [{id,Exchange}, {tag,Tag}, {handle,Handle}];
 
-%% Consume
-connect({Exchange, Key}) ->
-  connect({farm_tools:binarize(Exchange), farm_tools:binarize(Key)});
+%% Publish with no options
+connect(<<X/binary>>) -> connect({X,[]}).
 
-%% Publish
-connect(<<Exchange/binary>>) ->
-  ?info("Opening ~p for publishing", [Exchange]),
-  Handle = bunny_farm:open(Exchange),
-  %error_logger:info_msg("[gen_qserver] Returning handle spec"),
-  [{id,Exchange}, {tag,<<"">>}, {active,true}, {handle,Handle}];
-
-%% Publish
-connect(Exchange) ->
-  connect(farm_tools:binarize(Exchange)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% GEN_SERVER %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

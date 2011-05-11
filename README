@@ -17,9 +17,14 @@ starting a server, an additional argument is passed to the gen_qserver's
 start_link function which contains a list of connection specs. These can be
 of the following forms:
   <<"exchange">> -- Used for publishing
-  "exchange" -- Used for publishing (converted to a binary)
+  {<<"exchange">>,Options} -- Used for publishing
   {<<"exchange">>, <<"route">>} -- Used for consuming
-  {"exchange", "route"} -- Used for consuming
+  {{<<"exchange">>,Options}, {<<"route">>,Options}} -- Used for consuming
+
+Any valid connection parameters for an exchange.declare or queue.declare is
+allowed, plus a few additional conveniences. To set the encoding for a given
+connection, do this:
+  {<<"exchange">>, [{encoding,<<"application/bson">>}]}
 
 Based on the spec, a connection will be made and all bus handles will be 
 cached in memory by a separate server. These can be accessed in code by
@@ -208,7 +213,6 @@ The encoding property is only available for pub channels.
 
 Future
 ======
-. Connection-specific overrides
 . Message-specific overrides for encoding (currently this is done at the
   exchange level via the config)
 

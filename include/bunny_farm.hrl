@@ -12,5 +12,6 @@
 -type bus_handle() :: #bus_handle{}.
 -type exchange() :: binary().
 -type routing_key() :: binary().
+-type myabe_binary() :: binary() | {binary(),list()}.
 
 -endif.

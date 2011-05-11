@@ -10,7 +10,9 @@
          to_amqp_props/1,
          to_basic_consume/1,
          is_rpc/1,
-         reply_to/1, reply_to/2, content_type/1, correlation_id/1 ]).
+         reply_to/1, reply_to/2, 
+         content_type/1, content_type/2,
+         correlation_id/1 ]).
 
 %% Properties is a 'P_basic' record. We convert it back to a tuple
 %% list
@@ -153,6 +155,9 @@ content_type(#amqp_msg{}=Content) ->
 content_type(Props) when is_list(Props) ->
   p(content_type, Props).
 
+%% Override the content type in a bus handle
+content_type(ContentType, #bus_handle{options=Os}=BusHandle) ->
+  BusHandle#bus_handle{options=lists:merge([{content_type,ContentType}],Os)}.
 
 p(P, #amqp_msg{}=Content) ->
   p(P, farm_tools:decode_properties(Content), undefined);
