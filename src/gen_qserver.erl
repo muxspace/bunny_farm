@@ -74,6 +74,30 @@ connect({MaybeX, MaybeK}) ->
 connect(<<X/binary>>) -> connect({X,[]}).
 
 
+response({noreply, ModState}, #gen_qstate{}=State) ->
+  {noreply, State#gen_qstate{module_state=ModState}};
+
+response({noreply, ModState, hibernate}, #gen_qstate{}=State) ->
+  {noreply, State#gen_qstate{module_state=ModState}, hibernate};
+
+response({noreply, ModState, Timeout}, #gen_qstate{}=State) ->
+  {noreply, State#gen_qstate{module_state=ModState}, Timeout};
+
+response({reply, Reply, ModState}, #gen_qstate{}=State) ->
+  {reply, Reply, State#gen_qstate{module_state=ModState}};
+
+response({reply, Reply, ModState, hibernate}, #gen_qstate{}=State) ->
+  {reply, Reply, State#gen_qstate{module_state=ModState}, hibernate};
+
+response({reply, Reply, ModState, Timeout}, #gen_qstate{}=State) ->
+  {reply, Reply, State#gen_qstate{module_state=ModState}, Timeout};
+
+response({stop, Reason, ModState}, #gen_qstate{}=State) ->
+  {stop, Reason, State#gen_qstate{module_state=ModState}};
+
+response({stop, Reason, Reply, ModState}, #gen_qstate{}=State) ->
+  {stop, Reason, Reply, State#gen_qstate{module_state=ModState}}.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% GEN_SERVER %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 init([Module, Args, ConnSpecs]) ->
@@ -98,15 +122,15 @@ init([Module, Args, ConnSpecs]) ->
 handle_call(Request, From, State) ->
   Module = State#gen_qstate.module,
   ModuleState = State#gen_qstate.module_state,
-  {reply, Response, NextState} = Module:handle_call(Request,From,ModuleState),
-  {reply, Response, State#gen_qstate{module_state=NextState}}.
+  Response = Module:handle_call(Request,From,ModuleState),
+  response(Response, State).
 
 
 handle_cast(Request, State) ->
   Module = State#gen_qstate.module,
   ModuleState = State#gen_qstate.module_state,
-  {noreply, NextState} = Module:handle_cast(Request,ModuleState),
-  {noreply, State#gen_qstate{module_state=NextState}}.
+  Response = Module:handle_cast(Request,ModuleState),
+  response(Response, State).
 
 
 
