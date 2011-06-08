@@ -3,7 +3,7 @@ declaration and handshake process to make writing publishers and consumers a
 little easier.
 
 Included are queue-based implementations of a gen_server and gen_fsm
-(forthcoming) that abstract away some of the complexities of using the
+that abstract away some of the complexities of using the
 message queue. These behaviors unify the standard gen_server APIs with the
 message queue semantics, simplifying the behaviour implementation while
 maintaining flexibility in the communication methods. These servers manage all
@@ -46,6 +46,9 @@ Support for RPCs is built into the gen_qserver. They are handled automatically
 by the underlying implementation, dispatching to handle_call/3 and then
 replying to the specified exchange and queue. RPCs are sent as erlang binaries
 as opposed to BSON for greater flexibility.
+
+Responses utilize the standard AMQP method for replying to an RPC. This can be
+over-ridden using a specific syntax for the routing key.
 
 Callbacks
 ---------
@@ -145,7 +148,8 @@ the operation is made. A special form of this field can be used to send the
 response over a separate exchange.
 
 Respond On Same Exchange
-The standard behaviour is to respond on the same exchange as the request. Any
+The standard behaviour is to respond on the default exchange as specified in
+the AMQP spec. The queue will be named based on the reply-to field. Any
 bitstring is valid except one containing a colon, as this will be interpreted
 as a two part route (see below).
   ReplyTo = <<"reply_route">>
