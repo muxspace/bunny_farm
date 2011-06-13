@@ -102,16 +102,14 @@ response({stop, Reason, Reply, ModState}, #gen_qstate{}=State) ->
 
 init([Module, Args, ConnSpecs]) ->
   {ok,Pid} = qcache:start_link(),
+  Handles = lists:map(fun(Conn) -> connect(Conn) end, ConnSpecs),
+  qcache:put_conns(Pid, Handles),
   random:seed(now()),
   case Module:init(Args, Pid) of
     {ok, ModuleState} ->
-      Handles = lists:map(fun(Conn) -> connect(Conn) end, ConnSpecs),
-      qcache:put_conns(Pid, Handles),
       State = #gen_qstate{module=Module, module_state=ModuleState, cache_pid=Pid},
       Response = {ok, State};
     {ok, ModuleState, Timeout} ->
-      Handles = lists:map(fun(Conn) -> connect(Conn) end, ConnSpecs),
-      qcache:put_conns(Pid, Handles),
       State = #gen_qstate{module=Module, module_state=ModuleState, cache_pid=Pid},
       Response = {ok, State, Timeout};
     {stop, Reason} ->

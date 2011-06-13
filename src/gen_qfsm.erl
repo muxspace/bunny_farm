@@ -108,17 +108,15 @@ connect(Exchange) ->
 
 init([Module, Args, ConnSpecs]) ->
   {ok,Pid} = qcache:start_link(),
+  Handles = lists:map(fun(Conn) -> connect(Conn) end, ConnSpecs),
+  qcache:put_conns(Pid, Handles),
   random:seed(now()),
   case Module:init(Args, Pid) of
     {ok, StateName, StateData} ->
-      Handles = lists:map(fun(Conn) -> connect(Conn) end, ConnSpecs),
-      qcache:put_conns(Pid, Handles),
       State = #gen_qstate{module=Module, module_state=StateData,
                           fsm_state=StateName, cache_pid=Pid},
       Response = {ok, static_state, State};
     {ok, StateName, StateData, Timeout} ->
-      Handles = lists:map(fun(Conn) -> connect(Conn) end, ConnSpecs),
-      qcache:put_conns(Pid, Handles),
       State = #gen_qstate{module=Module, module_state=StateData,
                           fsm_state=StateName, cache_pid=Pid},
       Response = {ok, static_state, State, Timeout};
