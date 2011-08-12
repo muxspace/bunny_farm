@@ -16,6 +16,7 @@
 -behaviour(gen_fsm).
 -include("bunny_farm.hrl").
 -include("private_macros.hrl").
+-compile([{parse_transform,lager_transform}]).
 -export([behaviour_info/1]).
 -export([start_link/4, start_link/5, init/1,
          handle_info/3,
@@ -29,6 +30,7 @@
          send_event_after/2,
          start_timer/2, cancel_timer/1]).
 -export([static_state/2, static_state/3]).
+
 -record(gen_qstate, {module, module_state, fsm_state, cache_pid}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PUBLIC %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -96,7 +98,7 @@ bus(CachePid, {id,X}) ->
 %% Consume
 -spec connect({exchange(), routing_key()}) -> [ {exchange(), boolean(), bus_handle()} ].
 connect({<<Exchange/binary>>, <<Key/binary>>}) ->
-  ?info("Opening ~p => ~p for consuming", [Exchange,Key]),
+  lager:info("Opening ~p => ~p for consuming", [Exchange,Key]),
   Handle = bunny_farm:open(Exchange,Key),
   Tag = tag(),
   bunny_farm:consume(Handle, [{consumer_tag,Tag}]),
@@ -109,7 +111,7 @@ connect({Exchange, Key}) ->
 
 %% Publish
 connect(<<Exchange/binary>>) ->
-  ?info("Opening ~p for publishing", [Exchange]),
+  lager:info("Opening ~p for publishing", [Exchange]),
   Handle = bunny_farm:open(Exchange),
   %error_logger:info_msg("[gen_qfsm] Returning handle spec"),
   [{id,Exchange}, {tag,<<"">>}, {active,true}, {handle,Handle}];
@@ -230,7 +232,7 @@ handle_sync_event(Event, From, static_state, State) ->
 
 %% Tags are auto-generated during subscription
 handle_info(#'basic.consume_ok'{consumer_tag=Tag}, static_state, State) ->
-  ?info("Connection ACK on consumer_tag ~p",[Tag]),
+  lager:info("Connection ACK on consumer_tag ~p",[Tag]),
   qcache:activate(State#gen_qstate.cache_pid, {tag,Tag}),
   {next_state, static_state, State};
 
@@ -245,7 +247,7 @@ handle_info({#'basic.deliver'{routing_key=Key}, Content},
         static_state({Key, Payload}, self(), State),
       {X,ReplyTo} = farm_tools:reply_to(Content),
       BusHandle = bus(CachePid, {id,X}),
-      ?info("Responding to ~p => ~p", [X,ReplyTo]),
+      lager:info("Responding to ~p => ~p", [X,ReplyTo]),
       Props = [ {content_type, farm_tools:content_type(Content)},
                 {correlation_id, farm_tools:correlation_id(Content)} ],
       Msg = #message{payload=Response, props=Props},

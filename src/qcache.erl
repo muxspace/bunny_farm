@@ -16,6 +16,7 @@
 -behaviour(gen_server).
 -include("bunny_farm.hrl").
 -include("private_macros.hrl").
+-compile([{parse_transform,lager_transform}]).
 -export([start_link/0, init/1,
          handle_call/3,
          handle_cast/2,
@@ -126,7 +127,7 @@ handle_cast({put_conns,Conns}, State) when is_list(Conns) ->
     lists:keystore(QConn#qconn.id, 2, Acc, QConn)
   end,
   Handles = lists:foldl(Fn, State#state.handles, Conns),
-  ?info("Storing handles:~n  ~p", [Handles]),
+  lager:info("Storing handles:~n  ~p", [Handles]),
   {noreply, State#state{handles=Handles}};
 
 handle_cast({activate, {tag,Tag}}, State) ->

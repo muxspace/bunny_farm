@@ -16,6 +16,7 @@
 -behaviour(gen_server).
 -include("bunny_farm.hrl").
 -include("private_macros.hrl").
+-compile([{parse_transform,lager_transform}]).
 -export([behaviour_info/1]).
 -export([start_link/4, start_link/5, init/1,
          handle_call/3,
@@ -66,14 +67,14 @@ bus(CachePid, {id,X}) ->
 %% Publish with options
 %-spec connect({maybe_binary(), maybe_binary()}) -> [tuple()].
 connect({<<X/binary>>, Options}) when is_list(Options) ->
-  ?info("Opening ~p for publishing with options ~p", [X,Options]),
+  lager:info("Opening ~p for publishing with options ~p", [X,Options]),
   Handle = bunny_farm:open({X,Options}),
   %error_logger:info_msg("[gen_qserver] Returning handle spec"),
   [{id,X}, {tag,<<"">>}, {active,true}, {handle,Handle}];
 
 %% Consume with maybe options
 connect({MaybeX, MaybeK}) ->
-  ?info("Opening ~p => ~p for consuming", [MaybeX,MaybeK]),
+  lager:info("Opening ~p => ~p for consuming", [MaybeX,MaybeK]),
   Handle = bunny_farm:open(MaybeX,MaybeK),
   Tag = tag(),
   bunny_farm:consume(Handle, [{consumer_tag,Tag}]),
@@ -148,22 +149,22 @@ handle_cast(Request, State) ->
 
 %% Tags are auto-generated during subscription
 handle_info(#'basic.consume_ok'{consumer_tag=Tag}, State) ->
-  ?info("Connection ACK on consumer_tag ~p",[Tag]),
+  lager:info("Connection ACK on consumer_tag ~p",[Tag]),
   qcache:activate(State#gen_qstate.cache_pid, {tag,Tag}),
   {noreply, State};
 
 % Handle messages coming off the bus
 handle_info({#'basic.deliver'{routing_key=Key}, Content}, State) ->
   CachePid = State#gen_qstate.cache_pid,
-  ?verbose("Message:~n  ~p", [Content]),
+  lager:debug("Message:~n  ~p", [Content]),
   Payload = farm_tools:decode_payload(Content),
   case farm_tools:is_rpc(Content) of
     true -> 
       {reply,Response,NewState} = handle_call({Key, Payload}, self(), State),
       {X,ReplyTo} = farm_tools:reply_to(Content),
       BusHandle = bus(CachePid, {id,X}),
-      ?info("Responding to ~p => ~p", [X,ReplyTo]),
-      ?info("Response = ~p", [Response]),
+      lager:info("Responding to ~p => ~p", [X,ReplyTo]),
+      lager:info("Response = ~p", [Response]),
       Props = [ {content_type, farm_tools:content_type(Content)},
                 {correlation_id, farm_tools:correlation_id(Content)} ],
       Msg = #message{payload=Response, props=Props},

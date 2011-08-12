@@ -15,6 +15,7 @@
 -module(bunny_farm).
 -include("bunny_farm.hrl").
 -include("private_macros.hrl").
+-compile([{parse_transform,lager_transform}]).
 -export([open/1, open/2, close/1, close/2]).
 -export([declare_exchange/1, declare_exchange/2,
   declare_queue/1, declare_queue/2, declare_queue/3,
@@ -79,7 +80,7 @@ consume(#bus_handle{}=BusHandle) ->
 consume(#bus_handle{queue=Q,channel=Channel}, Options) when is_list(Options) ->
   AllOptions = [{queue,Q}, {no_ack,true}] ++ Options,
   BasicConsume = farm_tools:to_basic_consume(AllOptions),
-  ?info("Sending subscription request:~n  ~p", [BasicConsume]),
+  lager:info("Sending subscription request:~n  ~p", [BasicConsume]),
   amqp_channel:subscribe(Channel, BasicConsume, self()).
 
 
@@ -97,7 +98,7 @@ publish(#message{payload=Payload, props=Props}, K,
     M -> M
   end,
   EncPayload = farm_tools:encode_payload(MimeType, Payload),
-  ?verbose("Publish:~n  ~p", [EncPayload]),
+  lager:debug("Publish:~n  ~p", [EncPayload]),
   ContentType = {content_type,MimeType},
   AProps = farm_tools:to_amqp_props(lists:merge([ContentType], Props)),
   AMsg = #amqp_msg{payload=EncPayload, props=AProps},
@@ -151,7 +152,7 @@ declare_exchange(#bus_handle{exchange= <<"">>}) -> ok;
 declare_exchange(#bus_handle{exchange=Key, channel=Channel, options=Options}) ->
   AllOptions = lists:merge([{exchange,Key}], Options),
   ExchDeclare = farm_tools:to_exchange_declare(AllOptions),
-  ?info("Declaring exchange: ~p", [ExchDeclare]),
+  lager:info("Declaring exchange: ~p", [ExchDeclare]),
   #'exchange.declare_ok'{} = amqp_channel:call(Channel, ExchDeclare),
   ok.
 
@@ -190,6 +191,7 @@ bind(Q, BindKey, #bus_handle{exchange=X, channel=Channel}=BusHandle) ->
 open_it(#bus_handle{}=BusHandle) ->
   Keys = [amqp_username, amqp_password,amqp_virtual_host],
   {H,R} = get_server(),
+  lager:info("Opening connection to ~p:~p", [H,R]),
   [U,P,V] = lists:map(fun get_env/1, Keys),
   Params = #amqp_params{username=U, password=P, virtual_host=V,
              host=H, port=R},
@@ -216,7 +218,7 @@ default(Key) ->
 get_env(Key) ->
   Default = default(Key),
   case application:get_env(Key) of
-    undefined -> ?info("Using default ~p ~p", [Key,Default]), Default;
+    undefined -> lager:info("Using default ~p ~p", [Key,Default]), Default;
     {ok,H} -> H
   end.
 
