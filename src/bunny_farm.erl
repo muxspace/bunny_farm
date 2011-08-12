@@ -188,8 +188,9 @@ bind(Q, BindKey, #bus_handle{exchange=X, channel=Channel}=BusHandle) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PRIVATE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 open_it(#bus_handle{}=BusHandle) ->
-  Keys = [amqp_username, amqp_password,amqp_virtual_host, amqp_host,amqp_port],
-  [U,P,V,H,R] = lists:map(fun get_env/1, Keys),
+  Keys = [amqp_username, amqp_password,amqp_virtual_host],
+  {H,R} = get_server(),
+  [U,P,V] = lists:map(fun get_env/1, Keys),
   Params = #amqp_params{username=U, password=P, virtual_host=V,
              host=H, port=R},
   open_it(network, Params, BusHandle).
@@ -204,6 +205,7 @@ default(Key) ->
   D = [ {amqp_username, <<"guest">>},
         {amqp_password, <<"guest">>},
         {amqp_virtual_host, <<"/">>},
+        {amqp_servers, []}, % Format is {host,port}
         {amqp_host, "localhost"},
         {amqp_port, 5672},
         {amqp_encoding, <<"application/x-erlang">>},
@@ -216,6 +218,17 @@ get_env(Key) ->
   case application:get_env(Key) of
     undefined -> ?info("Using default ~p ~p", [Key,Default]), Default;
     {ok,H} -> H
+  end.
+
+%% If amqp_servers is defined, use that. Otherwise fall back to amqp_host and
+%% amqp_port
+get_server() ->
+  case get_env(amqp_servers) of
+    [] ->
+      {get_env(amqp_host), get_env(amqp_port)};
+    Servers ->
+      Idx = random:uniform(length(Servers)),
+      lists:nth(Idx, Servers)
   end.
 
 %% Define defaults that override rabbitmq defaults

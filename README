@@ -187,8 +187,7 @@ added to the parameter list of your application.
   {amqp_username, <<"guest">>},
   {amqp_password, <<"guest">>},
   {amqp_virtual_host, <<"/">>},
-  {amqp_host, "localhost"},
-  {amqp_port, "5672"},
+  {amqp_host, [{"localhost",5672}] },
   {amqp_encoding, <<"application/erlang">>},
 
   {amqp_exchanges, [
@@ -197,6 +196,14 @@ added to the parameter list of your application.
   {amqp_queues, [
     {<<"routing_key">>, [{K,V}] }
   ]}
+
+Note that the amqp_host and amqp_port are now deprecated in favor of the
+singular amqp_servers. The older configuration will continue to work, but new
+applications should use amqp_servers. Keep in mind that if amqp_servers is
+populated, then it will override any settings in the legacy fields. This change
+towards a singular amqp_servers variable was made to support clusters.
+Multiple {host,port} tuples can be entered as a list and will be selected
+randomly. In the future this may switch to a round-robin or other method.
 
 Channel definitions provide a way to set connection configuration each time a
 specific channel is opened. If no such information is provided, then default

@@ -79,6 +79,7 @@ atomize(List, Sep) when is_list(List) ->
   list_to_atom(listify(List, Sep)).
 
 %% Convert a list of elements into a single string
+%% DEPRECATED Use lists:concat instead
 listify(List) when is_list(List) ->
   listify(List, " ").
 
