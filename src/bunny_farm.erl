@@ -219,7 +219,7 @@ get_env(Key) ->
   Default = default(Key),
   case application:get_env(Key) of
     undefined -> lager:info("Using default ~p ~p", [Key,Default]), Default;
-    {ok,H} -> H
+    {ok,H} -> lager:info("Using ~p = ~p", [Key,H]), H
   end.
 
 %% If amqp_servers is defined, use that. Otherwise fall back to amqp_host and
