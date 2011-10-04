@@ -127,7 +127,7 @@ handle_cast({put_conns,Conns}, State) when is_list(Conns) ->
     lists:keystore(QConn#qconn.id, 2, Acc, QConn)
   end,
   Handles = lists:foldl(Fn, State#state.handles, Conns),
-  lager:info("Storing handles:~n  ~p", [Handles]),
+  lager:debug("Storing handles:~n  ~p", [Handles]),
   {noreply, State#state{handles=Handles}};
 
 handle_cast({activate, {tag,Tag}}, State) ->
