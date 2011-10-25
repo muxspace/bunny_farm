@@ -172,6 +172,18 @@ handle_info({#'basic.deliver'{routing_key=Key}, Content}, State) ->
       {noreply, NewState};
     _ ->
       handle_cast({Key,Payload}, State)
+  end;
+
+%% Fallback
+handle_info(Info, #gen_qstate{module=Module,
+                              module_state=ModuleState}=State) ->
+  case Module:handle_info(Info, ModuleState) of
+    {noreply, NewModuleState} ->
+       {noreply, State#gen_qstate{module_state=NewModuleState}};
+    {noreply, NewModuleState, AfterRequest} -> % timeout/hibernate
+       {noreply, State#gen_qstate{module_state=NewModuleState}, AfterRequest};
+    {stop, Reason, NewModuleState} ->
+       {stop, Reason, State#gen_qstate{module_state=NewModuleState}}
   end.
 
 
