@@ -160,15 +160,20 @@ handle_info({#'basic.deliver'{routing_key=Key}, Content}, State) ->
   Payload = farm_tools:decode_payload(Content),
   case farm_tools:is_rpc(Content) of
     true -> 
-      {reply,Response,NewState} = handle_call({Key, Payload}, self(), State),
-      {X,ReplyTo} = farm_tools:reply_to(Content),
-      BusHandle = bus(CachePid, {id,X}),
-      lager:debug("Responding to ~p => ~p", [X,ReplyTo]),
-      lager:debug("Response = ~p", [Response]),
-      Props = [ {content_type, farm_tools:content_type(Content)},
-                {correlation_id, farm_tools:correlation_id(Content)} ],
-      Msg = #message{payload=Response, props=Props},
-      bunny_farm:respond(Msg, ReplyTo, BusHandle),
+      ResponseTuple = handle_call({Key, Payload}, self(), State),
+      case ResponseTuple of
+        {noreply,NewState} -> ok;
+        % TODO: Clean up the embedded cases
+        {reply,Response,NewState} ->
+          {X,ReplyTo} = farm_tools:reply_to(Content),
+          BusHandle = bus(CachePid, {id,X}),
+          lager:debug("Responding to ~p => ~p", [X,ReplyTo]),
+          lager:debug("Response = ~p", [Response]),
+          Props = [ {content_type, farm_tools:content_type(Content)},
+                    {correlation_id, farm_tools:correlation_id(Content)} ],
+          Msg = #message{payload=Response, props=Props},
+          bunny_farm:respond(Msg, ReplyTo, BusHandle)
+      end,
       {noreply, NewState};
     _ ->
       handle_cast({Key,Payload}, State)
