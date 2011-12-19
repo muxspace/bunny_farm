@@ -133,8 +133,24 @@ directly.
 Named Queue
 In the event that an explicit queue name is required, then the following can
 be done.
-  BusHandle = bunny_farm:open(<<"exchange">>, <<"routing_key.#">>, [{queue,Q}])
+  BusHandle = bunny_farm:open(<<"exchange">>, {<<"routing_key.#">>,[{queue,Q}]})
   bunny_farm:consume(BusHandle)
+
+If no routing key is necessary, then the following is simpler
+  BusHandle = bunny_farm:open(<<"exchange">>),
+  bunny_farm:publish(Message, QueueName, BusHandle),
+
+Work Queues
+A work queue can be implemented by using the default exchange with a named
+queue.
+  BusHandle = bunny_farm:open(<<"">>),
+  bunny_farm:publish(Message, QueueName, BusHandle),
+  
+When using a gen_qserver, the connection spec is described by
+  {<<"">>, {QueueName, [{exclusive,false}]}}
+
+Note that this structure is the same as what gets passed in to the open()
+function in the first named queue example.
 
 Once the subscriptions have been set up, then raw AMQP messages need to be
 detected to actually process data. In a gen_server setting, this is caught
