@@ -39,6 +39,10 @@ decode_payload(#amqp_msg{payload=Payload}=Content) ->
   decode_payload(content_type(Content), Payload);
   
 decode_payload(Payload) -> decode_payload(bson, Payload).
+
+decode_payload(none, Payload) -> Payload;
+decode_payload({M,F}, Payload) -> {M,F}(Payload);
+
 decode_payload(<<"application/x-erlang">>, Payload) ->
   decode_payload(erlang, Payload);
 decode_payload(erlang, Payload) -> binary_to_term(Payload);
@@ -54,6 +58,10 @@ decode_payload(bson, Payload) ->
   end.
 
 encode_payload(Payload) -> encode_payload(bson, Payload).
+
+encode_payload(none, Payload) -> Payload;
+encode_payload({M,F}, Payload) -> {M,F}(Payload);
+
 encode_payload(<<"application/x-erlang">>, Payload) ->
   encode_payload(erlang, Payload);
 encode_payload(erlang, Payload) -> term_to_binary(Payload);
