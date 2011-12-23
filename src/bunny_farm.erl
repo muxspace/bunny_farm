@@ -193,11 +193,11 @@ open_it(#bus_handle{}=BusHandle) ->
   {H,R} = get_server(),
   lager:debug("Opening connection to ~p:~p", [H,R]),
   [U,P,V] = lists:map(fun get_env/1, Keys),
-  Params = #amqp_params_network{username=U, password=P, virtual_host=V,
+  Params = #amqp_params{username=U, password=P, virtual_host=V,
              host=H, port=R},
   open_it(network, Params, BusHandle).
 
-open_it(Method, #amqp_params_network{}=Params, #bus_handle{}=BusHandle) ->
+open_it(Method, #amqp_params{}=Params, #bus_handle{}=BusHandle) ->
   {ok,Connection} = amqp_connection:start(Method, Params),
   {ok,Channel} = amqp_connection:open_channel(Connection),
   BusHandle#bus_handle{channel=Channel, conn=Connection}.
