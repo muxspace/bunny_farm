@@ -195,15 +195,10 @@ open_it(#bus_handle{}=BusHandle) ->
   [U,P,V] = lists:map(fun get_env/1, Keys),
   Params = #amqp_params_network{username=U, password=P, virtual_host=V,
              host=H, port=R},
-  open_it(Params, BusHandle).
+  open_it(network, Params, BusHandle).
 
-open_it(#amqp_params_network{}=Params, #bus_handle{}=BusHandle) ->
-  {ok,Connection} = amqp_connection:start(Params),
-  {ok,Channel} = amqp_connection:open_channel(Connection),
-  BusHandle#bus_handle{channel=Channel, conn=Connection};
-
-open_it(#amqp_params_direct{}=Params, #bus_handle{}=BusHandle) ->
-  {ok,Connection} = amqp_connection:start(Params),
+open_it(Method, #amqp_params_network{}=Params, #bus_handle{}=BusHandle) ->
+  {ok,Connection} = amqp_connection:start(Method, Params),
   {ok,Channel} = amqp_connection:open_channel(Connection),
   BusHandle#bus_handle{channel=Channel, conn=Connection}.
 
