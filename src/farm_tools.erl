@@ -26,6 +26,7 @@
          is_rpc/1,
          reply_to/1, reply_to/2, 
          content_type/1, content_type/2,
+         encoding/1,
          correlation_id/1 ]).
 
 %% Properties is a 'P_basic' record. We convert it back to a tuple
@@ -41,7 +42,8 @@ decode_payload(#amqp_msg{payload=Payload}=Content) ->
 decode_payload(Payload) -> decode_payload(bson, Payload).
 
 decode_payload(none, Payload) -> Payload;
-decode_payload({M,F}, Payload) -> {M,F}(Payload);
+decode_payload(<<"application/octet-stream">>, Payload) -> Payload;
+decode_payload({_E,M,F}, Payload) -> {M,F}(Payload);
 
 decode_payload(<<"application/x-erlang">>, Payload) ->
   decode_payload(erlang, Payload);
@@ -60,7 +62,8 @@ decode_payload(bson, Payload) ->
 encode_payload(Payload) -> encode_payload(bson, Payload).
 
 encode_payload(none, Payload) -> Payload;
-encode_payload({M,F}, Payload) -> {M,F}(Payload);
+encode_payload(<<"application/octet-stream">>, Payload) -> Payload;
+encode_payload({_E,M,F}, Payload) -> {M,F}(Payload);
 
 encode_payload(<<"application/x-erlang">>, Payload) ->
   encode_payload(erlang, Payload);
@@ -181,6 +184,13 @@ content_type(Props) when is_list(Props) ->
 %% Override the content type in a bus handle
 content_type(ContentType, #bus_handle{options=Os}=BusHandle) ->
   BusHandle#bus_handle{options=lists:merge([{content_type,ContentType}],Os)}.
+
+encoding(Options) ->
+  case proplists:get_value(encoding, Options) of
+    {E,_M,_F} -> E;
+    none -> <<"application/octet-stream">>;
+    E -> E
+  end.
 
 p(P, #amqp_msg{}=Content) ->
   p(P, farm_tools:decode_properties(Content), undefined);

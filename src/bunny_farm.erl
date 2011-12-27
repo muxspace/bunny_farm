@@ -94,7 +94,7 @@ consume(#bus_handle{queue=Q,channel=Channel}, Options) when is_list(Options) ->
 publish(#message{payload=Payload, props=Props}, K,
         #bus_handle{exchange=X, channel=Channel, options=Options}) ->
   MimeType = case farm_tools:content_type(Props) of
-    undefined -> proplists:get_value(encoding, Options);
+    undefined -> farm_tools:encoding(Options);
     M -> M
   end,
   EncPayload = farm_tools:encode_payload(MimeType, Payload),
