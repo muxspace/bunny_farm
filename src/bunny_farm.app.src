@@ -8,6 +8,5 @@
                   kernel,
                   stdlib
                  ]},
-  {mod, { bunny_farm_app, []}},
   {env, []}
  ]}.
