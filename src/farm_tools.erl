@@ -53,7 +53,7 @@ decode_payload(<<"application/bson">>, Payload) ->
 decode_payload(bson, Payload) ->
   try
     {Doc,_Bin} = bson_binary:get_document(Payload),
-    bson:reflate(Doc)
+    bson:fields(Doc)
   catch
     error:{badmatch,_} -> decode_payload(erlang, Payload);
     error:function_clause -> decode_payload(erlang, Payload)
