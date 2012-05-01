@@ -56,3 +56,18 @@ encoding_none_test() ->
   bunny_farm:close(SubBus, ConsumerTag),
   bunny_farm:close(PubBus),
   ?assertEqual(<<"dummy payload">>, Act).
+
+resource_cleanup_test() ->
+  Ports1 = length(erlang:ports()),
+  Procs1 = length(processes()),
+  BusA = bunny_farm:open({<<"dummy.exchange">>, [{encoding, none}]}),
+  BusB = bunny_farm:open(<<"">>),
+  Ports2 = length(erlang:ports()),
+  Procs2 = length(processes()),
+  bunny_farm:close(BusA),
+  bunny_farm:close(BusB),
+  true = Ports2 > Ports1,
+  true = Procs2 > Procs1,
+  timer:sleep(100), % asynchronous shutdown somewhere
+  Ports1 = length(erlang:ports()),
+  Procs1 = length(processes()).
