@@ -59,7 +59,6 @@ open(MaybeX, MaybeK) ->
   bunny_farm:bind(Q, K, BusHandle).
 
 
-close(#bus_handle{exchange = <<"">>}) -> ok;
 close(#bus_handle{channel=Channel, conn=Connection}) ->
   amqp_channel:close(Channel),
   amqp_connection:close(Connection).
