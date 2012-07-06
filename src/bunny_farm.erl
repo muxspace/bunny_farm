@@ -1,11 +1,11 @@
 %% Copyright 2011 Brian Lee Yung Rowe
-%% 
+%%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
 %% You may obtain a copy of the License at
-%% 
+%%
 %%   http://www.apache.org/licenses/LICENSE-2.0
-%% 
+%%
 %% Unless required by applicable law or agreed to in writing, software
 %% distributed under the License is distributed on an "AS IS" BASIS,
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -21,13 +21,13 @@
   declare_queue/1, declare_queue/2, declare_queue/3,
   bind/3]).
 -export([consume/1, consume/2,
-  publish/3, 
+  publish/3,
   rpc/3, rpc/4, respond/3]).
 -ifdef(TEST).
 -compile(export_all).
 -endif.
 
-%% Convenience function for opening a connection for publishing 
+%% Convenience function for opening a connection for publishing
 %% messages. The routing key can be included but if it is not,
 %% then the connection can be re-used for multiple routing keys
 %% on the same exchange.
@@ -101,7 +101,7 @@ publish(#message{payload=Payload, props=Props}, K,
   ContentType = {content_type,MimeType},
   AProps = farm_tools:to_amqp_props(lists:merge([ContentType], Props)),
   AMsg = #amqp_msg{payload=EncPayload, props=AProps},
-  BasicPublish = #'basic.publish'{exchange=X, routing_key=K}, 
+  BasicPublish = #'basic.publish'{exchange=X, routing_key=K},
   amqp_channel:cast(Channel, BasicPublish, AMsg);
 
 publish(Payload, RoutingKey, #bus_handle{}=BusHandle) ->
@@ -119,7 +119,7 @@ rpc(#message{payload=Payload, props=Props}, K,
   AProps = farm_tools:to_amqp_props(lists:merge([ContentType], Props)),
   AMsg = #amqp_msg{payload=farm_tools:encode_payload(MimeType,Payload),
                    props=AProps},
-  BasicPublish = #'basic.publish'{exchange=X, routing_key=K}, 
+  BasicPublish = #'basic.publish'{exchange=X, routing_key=K},
   amqp_channel:cast(Channel, BasicPublish, AMsg).
 
 rpc(Payload, ReplyTo, K, BusHandle) ->
@@ -127,7 +127,7 @@ rpc(Payload, ReplyTo, K, BusHandle) ->
   rpc(#message{payload=Payload, props=Props}, K, BusHandle).
 
 
-%% This is used to send the response of an RPC. The primary difference 
+%% This is used to send the response of an RPC. The primary difference
 %% between this and publish is that the data is retained as an erlang
 %% binary.
 respond(#message{payload=Payload, props=Props}, RoutingKey,
@@ -135,7 +135,7 @@ respond(#message{payload=Payload, props=Props}, RoutingKey,
   MimeType = farm_tools:content_type(Props),
   AMsg = #amqp_msg{payload=farm_tools:encode_payload(MimeType,Payload),
                    props=farm_tools:to_amqp_props(Props)},
-  BasicPublish = #'basic.publish'{exchange=X, routing_key=RoutingKey}, 
+  BasicPublish = #'basic.publish'{exchange=X, routing_key=RoutingKey},
   amqp_channel:cast(Channel, BasicPublish, AMsg);
 
 respond(Payload, RoutingKey, #bus_handle{}=BusHandle) ->
@@ -161,7 +161,7 @@ declare_exchange(Key, #bus_handle{}=BusHandle) ->
   declare_exchange(BusHandle#bus_handle{exchange=Key}).
 
 %% http://www.rabbitmq.com/amqp-0-9-1-quickref.html
-%% Use configured options for the queue. Since no routing key is specified, 
+%% Use configured options for the queue. Since no routing key is specified,
 %% attempt to read options for the routing key <<"">>.
 declare_queue(#bus_handle{}=BusHandle) ->
   declare_queue(BusHandle, queue_options(<<"">>)).
@@ -177,7 +177,7 @@ declare_queue(Key, #bus_handle{channel=Channel}, Options) ->
   Q.
 
 
-  
+
 bind(Q, _BindKey, #bus_handle{exchange= <<"">>}=BusHandle) ->
   BusHandle#bus_handle{queue=Q};
 
@@ -203,22 +203,30 @@ open_it(Method, #amqp_params{}=Params, #bus_handle{}=BusHandle) ->
 
 
 default(Key) ->
-  D = [ {amqp_username, <<"guest">>},
-        {amqp_password, <<"guest">>},
-        {amqp_virtual_host, <<"/">>},
-        {amqp_servers, []}, % Format is {host,port}
-        {amqp_host, "localhost"},
-        {amqp_port, 5672},
-        {amqp_encoding, <<"application/x-erlang">>},
-        {amqp_exchanges, []},
-        {amqp_queues, []} ],
-  proplists:get_value(Key,D).
+    Defaults = [{amqp_username, <<"guest">>},
+                {amqp_password, <<"guest">>},
+                {amqp_virtual_host, <<"/">>},
+                {amqp_servers, []}, % Format is {host,port}
+                {amqp_host, "localhost"},
+                {amqp_port, 5672},
+                {amqp_encoding, <<"application/x-erlang">>},
+                {amqp_exchanges, []},
+                {amqp_queues, []}],
+
+    %% Note(superbobry): try fetching the value from 'bunny_farm'
+    %% environment first, this might be useful for example when all
+    %% applications use a single RabbitMQ instance.
+    case application:get_env(bunny_farm, Key) of
+        {ok, Value} -> Value;
+        undefined   ->
+            proplists:get_value(Key, Defaults)
+    end.
 
 get_env(Key) ->
   Default = default(Key),
   case application:get_env(Key) of
     undefined -> Default;
-    {ok,H} -> H
+    {ok, H} -> H
   end.
 
 %% If amqp_servers is defined, use that. Otherwise fall back to amqp_host and
@@ -274,5 +282,3 @@ resolve_options(queue, MaybeTuple) ->
     K -> Os = lists:merge(queue_options(K),Defaults)
   end,
   {K,Os}.
-
-
