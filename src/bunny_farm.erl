@@ -191,6 +191,8 @@ open_it(#bus_handle{}=BusHandle) ->
   Keys = [amqp_username, amqp_password,amqp_virtual_host],
   {H,R} = get_server(),
   lager:debug("Opening connection to ~p:~p", [H,R]),
+  lager:debug("Calling pid is ~p", [self()]),
+  lager:debug("Calling application is ~p", [application:get_application()]),
   [U,P,V] = lists:map(fun get_env/1, Keys),
   Params = #amqp_params{username=U, password=P, virtual_host=V,
              host=H, port=R},

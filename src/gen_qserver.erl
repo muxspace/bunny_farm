@@ -25,7 +25,7 @@
          terminate/2, code_change/3]).
 -export([call/2, call/3, cast/2]).
 
--record(gen_qstate, {module, module_state, cache_pid}).
+-record(gen_qstate, {module, module_state, cache_pid, encoding}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PUBLIC %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -44,8 +44,14 @@ call(ServerRef, Request, Timeout) ->
 cast(ServerRef, Request) ->
   gen_server:cast(ServerRef, Request).
 
+start_link(Module, Args, [{encoding,Encoding}|Options], Connections) ->
+  gen_server:start_link(?MODULE, [Module,Args,Connections,Encoding], Options);
+
 start_link(Module, Args, Options, Connections) ->
   gen_server:start_link(?MODULE, [Module,Args,Connections], Options).
+
+start_link(ServerName, Module, Args, [{encoding,Encoding}|Options], ConnSpecs) ->
+  gen_server:start_link(ServerName, ?MODULE, [Module,Args,ConnSpecs,Encoding], Options);
 
 start_link(ServerName, Module, Args, Options, ConnSpecs) ->
   gen_server:start_link(ServerName, ?MODULE, [Module,Args,ConnSpecs], Options).
@@ -130,6 +136,25 @@ init([Module, Args, ConnSpecs]) ->
     {stop, Reason} ->
       Response = {stop, Reason}
   end,
+  Response;
+
+%% Add an override for the encoding. All received messages will use this instead
+%% of what the message content-type specifies.
+init([Module, Args, ConnSpecs, Encoding]) ->
+  {ok,Pid} = qcache:start_link(),
+  Handles = lists:map(fun(Conn) -> connect(Conn) end, ConnSpecs),
+  qcache:put_conns(Pid, Handles),
+  random:seed(now()),
+  case Module:init(Args, Pid) of
+    {ok, ModuleState} ->
+      State = #gen_qstate{module=Module, module_state=ModuleState, cache_pid=Pid, encoding=Encoding},
+      Response = {ok, State};
+    {ok, ModuleState, Timeout} ->
+      State = #gen_qstate{module=Module, module_state=ModuleState, cache_pid=Pid},
+      Response = {ok, State, Timeout};
+    {stop, Reason} ->
+      Response = {stop, Reason}
+  end,
   Response.
 
 handle_call(Request, From, State) ->
@@ -157,7 +182,10 @@ handle_info(#'basic.consume_ok'{consumer_tag=Tag}, State) ->
 handle_info({#'basic.deliver'{routing_key=Key}, Content}, State) ->
   CachePid = State#gen_qstate.cache_pid,
   %lager:debug("Message:~n  ~p", [Content]),
-  Payload = farm_tools:decode_payload(Content),
+  Payload = case State#gen_qstate.encoding of
+    undefined -> farm_tools:decode_payload(Content);
+    Encoding -> farm_tools:decode_payload(Encoding,Content)
+  end,
   case farm_tools:is_rpc(Content) of
     true -> 
       ResponseTuple = handle_call({Key, Payload}, self(), State),
