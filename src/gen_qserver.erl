@@ -134,7 +134,7 @@ init([Module, Args, ConnSpecs, Encoding]) ->
       State = #gen_qstate{module=Module, module_state=ModuleState, cache_pid=Pid, encoding=Encoding},
       Response = {ok, State};
     {ok, ModuleState, Timeout} ->
-      State = #gen_qstate{module=Module, module_state=ModuleState, cache_pid=Pid},
+      State = #gen_qstate{module=Module, module_state=ModuleState, cache_pid=Pid, encoding=Encoding},
       Response = {ok, State, Timeout};
     {stop, Reason} ->
       Response = {stop, Reason}
