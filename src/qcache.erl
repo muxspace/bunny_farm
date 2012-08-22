@@ -115,6 +115,8 @@ handle_call({get_conn,Tuple}, _From, State) when is_tuple(Tuple) ->
   {reply, Conn, State}.
 
 
+handle_cast(stop, State) -> {stop,normal,State};
+
 %% This replaces existing handles with the same exchange name.
 handle_cast({put_conn,PropList}, State) when is_list(PropList) ->
   QConn = to_qconn(PropList),

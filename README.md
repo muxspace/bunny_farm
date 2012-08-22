@@ -249,7 +249,7 @@ added to the parameter list of your application.
 {amqp_username, <<"guest">>},
 {amqp_password, <<"guest">>},
 {amqp_virtual_host, <<"/">>},
-{amqp_host, [{"localhost",5672}] },
+{amqp_servers, [{"localhost",5672}] },
 {amqp_encoding, <<"application/erlang">>},
 
 {amqp_exchanges, [
@@ -280,13 +280,19 @@ routing key. Options are specified as a proplist. Current options include
 {type, binary()},
 {durable, boolean()},
 {exclusive, boolean()},
-
-{durable, boolean()},
-{exclusive, boolean()},
 {queue, binary()}
 ```
 
 The encoding property is only available for pub channels.
+
+## Performance
+The qcache model is slow due to the gen_server call. This will be moved to an 
+ETS table to manage all connections.
+
+### Processes
+A gen_qserver and gen_qfsm both utilize a qcache, so each server without any
+connections defined creates 2 processes. Once this is moved to ETS, it will
+be 1 process per server.
 
 ## Future
 

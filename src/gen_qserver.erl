@@ -220,8 +220,8 @@ handle_info(Info, #gen_qstate{module=Module,
   end.
 
 
-terminate(Reason, State) ->
-  Handles = qcache:connections(State#gen_qstate.cache_pid),
+terminate(Reason, #gen_qstate{cache_pid=CachePid}=State) ->
+  Handles = qcache:connections(CachePid),
   Module = State#gen_qstate.module,
   ModuleState = State#gen_qstate.module_state,
   Module:terminate(Reason, ModuleState),
@@ -229,6 +229,7 @@ terminate(Reason, State) ->
     bunny_farm:close(?PV(handle,PList), ?PV(tag,PList))
   end,
   lists:map(Fn, Handles),
+  gen_server:cast(CachePid,stop),
   ok.
 
 code_change(_OldVersion, State, _Extra) ->

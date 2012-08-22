@@ -57,7 +57,7 @@ handle_cast({set_value,K,V}, State) ->
   TupleList = lists:keystore(K,1,State#state.tuples, {K,V}),
   {noreply, State#state{tuples=TupleList}};
 
-handle_cast(stop, State) -> {noreply,State};
+handle_cast(stop, State) -> {stop,normal,State};
 
 handle_cast(A, State) ->
   error_logger:info_msg("[my_qserver] Got unexpected cast: ~p~n", [A]),
