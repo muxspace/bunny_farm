@@ -13,51 +13,84 @@
 %% limitations under the License.
 
 -module(qcache).
--behaviour(gen_server).
 -include("bunny_farm.hrl").
 -include("private_macros.hrl").
 -compile([{parse_transform,lager_transform}]).
--export([start_link/0, init/1,
-         handle_call/3,
-         handle_cast/2,
-         handle_info/2,
-         terminate/2, code_change/3]).
 -export([get_bus/2, get_conn/2,
          put_conn/2, put_conns/2,
          activate/2,
-         connections/1 ]).
+         connections/1,
+         new/0, delete/1]).
 
--record(state, {handles=[]}).
 -record(qconn, {id, tag, active=false, handle}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PUBLIC %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-start_link() ->
-  gen_server:start_link(?MODULE, [], []).
+new() ->
+  Tid = ets:new(qcache_ets, [set, private, {keypos,2}]),
+  {ok,Tid}.
 
-get_bus(ServerRef, Tuple) when is_tuple(Tuple) ->
-  gen_server:call(ServerRef, {get_bus, Tuple});
+get_bus(Tid, #qconn{id=Id}) ->
+  get_bus(Tid, Id);
 
-get_bus(ServerRef, Exchange) ->
-  gen_server:call(ServerRef, {get_bus, {id,Exchange}}).
+get_bus(Tid, PropList) when is_list(PropList) ->
+  get_bus(Tid, to_qconn(PropList));
 
-get_conn(ServerRef, Tuple) when is_tuple(Tuple) ->
-  gen_server:call(ServerRef, {get_conn, Tuple});
+get_bus(Tid, Id) ->
+  case ets:lookup(Tid, Id) of
+    [] -> not_found;
+    [#qconn{handle=Handle}] -> Handle
+  end.
 
-get_conn(ServerRef, Exchange) ->
-  gen_server:call(ServerRef, {get_conn, {id,Exchange}}).
+get_conn(Tid, {id,Id}) -> get_conn(Tid,Id);
 
-put_conn(ServerRef, PropList) ->
-  gen_server:cast(ServerRef, {put_conn, PropList}).
+get_conn(Tid, {tag,Tag}) ->
+  case ets:match(Tid, {'_','_',Tag,'_','_'}) of
+    [] -> not_found;
+    [[#qconn{}=Conn]] -> to_proplist(Conn)
+  end;
 
-put_conns(ServerRef, Conns) when is_list(Conns) ->
-  gen_server:cast(ServerRef, {put_conns, Conns}).
+get_conn(Tid, #qconn{id=Id}) ->
+  get_conn(Tid, Id);
 
-activate(ServerRef, Tuple) when is_tuple(Tuple) ->
-  gen_server:cast(ServerRef, {activate, Tuple}).
+get_conn(Tid, PropList) when is_list(PropList) ->
+  get_conn(Tid, to_qconn(PropList));
 
-connections(ServerRef) ->
-  gen_server:call(ServerRef, connections).
+get_conn(Tid, Id) ->
+  case ets:lookup(Tid, Id) of
+    [] -> not_found;
+    [#qconn{}=Conn] -> to_proplist(Conn)
+  end.
+
+put_conn(Tid, #qconn{}=Conn) ->
+  ets:insert(Tid, Conn);
+
+put_conn(Tid, PropList) ->
+  put_conn(Tid, to_qconn(PropList)).
+
+put_conns(Tid, Conns) when is_list(Conns) ->
+  [ put_conn(Tid, Conn) || Conn <- Conns ].
+
+activate(Tid, {id,Id}) ->
+  case ets:lookup(Tid,Id) of
+    [[]] -> ok;
+    [#qconn{}=Conn] -> put_conn(Tid, Conn#qconn{active=true});
+    Other -> error_logger:info_msg("[qcache] Unexpected result: '~p'~n",[Other])
+  end;
+
+activate(Tid, {tag,Tag}) ->
+  case ets:match(Tid, {'_','_',Tag,'_','_'}) of
+    [[]] -> ok;
+    [[#qconn{}=Conn]] -> put_conn(Tid, Conn#qconn{active=true});
+    Other -> error_logger:info_msg("[qcache] Unexpected result: '~p'~n",[Other])
+  end.
+
+connections(Tid) ->
+  Flat = lists:flatten(ets:match(Tid, '$1')),
+  [ to_proplist(X) || X <- Flat ].
+
+delete(Tid) -> 
+  ets:delete(Tid).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PRIVATE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 to_proplist(#qconn{}=QConn) ->
@@ -67,96 +100,4 @@ to_proplist(#qconn{}=QConn) ->
 
 to_qconn(PropList) when is_list(PropList) ->
   list_to_tuple([qconn|[?PV(X,PropList) || X <- record_info(fields,qconn)]]).
-
-
-bus({tag,Tag}, State) ->
-  case lists:keyfind(Tag,3,State#state.handles) of
-    false -> not_found;
-    #qconn{}=QConn -> QConn#qconn.handle
-  end;
-
-bus({id,Exchange}, State) ->
-  case lists:keyfind(Exchange,2,State#state.handles) of
-    false -> not_found;
-    #qconn{}=QConn -> QConn#qconn.handle
-  end.
-
-
-conn({tag,Tag}, State) ->
-  case lists:keyfind(Tag,3,State#state.handles) of
-    false -> not_found;
-    #qconn{}=QConn -> to_proplist(QConn)
-  end;
-
-conn({id,Exchange}, State) ->
-  case lists:keyfind(Exchange,2,State#state.handles) of
-    false -> not_found;
-    #qconn{}=QConn -> to_proplist(QConn)
-  end.
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% GEN_SERVER %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-init(_) ->
-  %error_logger:info_msg("[qcache] Starting up~n"),
-  {ok, #state{}}.
-
-handle_call(connections, _From, State) ->
-  Handles = lists:map(fun(X) -> to_proplist(X) end, State#state.handles),
-  {reply, Handles, State};
-
-handle_call({get_bus,Tuple}, _From, State) when is_tuple(Tuple) ->
-  BusHandle = bus(Tuple, State),
-  {reply, BusHandle, State};
-
-handle_call({get_conn,Tuple}, _From, State) when is_tuple(Tuple) ->
-  Conn = conn(Tuple, State),
-  {reply, Conn, State}.
-
-
-handle_cast(stop, State) -> {stop,normal,State};
-
-%% This replaces existing handles with the same exchange name.
-handle_cast({put_conn,PropList}, State) when is_list(PropList) ->
-  QConn = to_qconn(PropList),
-  Handles = lists:keystore(QConn#qconn.id, 2, State#state.handles, QConn),
-  {noreply, State#state{handles=Handles}};
-
-handle_cast({put_conns,Conns}, State) when is_list(Conns) ->
-  Fn = fun(X, Acc) ->
-    QConn = to_qconn(X),
-    lists:keystore(QConn#qconn.id, 2, Acc, QConn)
-  end,
-  Handles = lists:foldl(Fn, State#state.handles, Conns),
-  lager:debug("Storing handles:~n  ~p", [Handles]),
-  {noreply, State#state{handles=Handles}};
-
-handle_cast({activate, {tag,Tag}}, State) ->
-  H = State#state.handles,
-  Handles = case lists:keyfind(Tag,3, H) of
-    %% TODO Some sort of error needs to be thrown if the Tag doesn't exist
-    false -> H;
-    #qconn{}=QConn ->
-      lists:keystore(Tag,3,H,QConn#qconn{active=true})
-  end,
-  {noreply, State#state{handles=Handles}};
-
-handle_cast({activate, {id,Exchange}}, State) ->
-  H = State#state.handles,
-  Handles = case lists:keyfind(Exchange,2, H) of
-    %% TODO Some sort of error needs to be thrown if the Tag doesn't exist
-    false -> H;
-    #qconn{}=QConn ->
-      lists:keystore(Exchange,2,H,QConn#qconn{active=true})
-  end,
-  {noreply, State#state{handles=Handles}}.
-
-
-handle_info(_Info, State) -> {noreply, State}.
-
-terminate(_Reason, _State) -> ok.
-
-code_change(_OldVersion, State, _Extra) ->
-  {ok, State}.
 

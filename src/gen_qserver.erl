@@ -85,11 +85,15 @@ connect({MaybeX, MaybeK}) ->
   Tag = tag(),
   bunny_farm:consume(Handle, [{consumer_tag,Tag}]),
   Exchange = case MaybeX of
-    {Exch,_Os} -> Exch;
+    {Exch,_} -> Exch;
     Exch -> Exch
   end,
+  Key = case MaybeK of
+    {K,_} -> K;
+    K -> K
+  end,
   %error_logger:info_msg("[gen_qserver] Returning handle spec"),
-  [{id,Exchange}, {tag,Tag}, {handle,Handle}];
+  [{id,{Exchange,Key}}, {tag,Tag}, {handle,Handle}];
 
 %% Publish with no options
 connect(<<X/binary>>) -> connect({X,[]}).
@@ -122,7 +126,7 @@ response({stop, Reason, Reply, ModState}, #gen_qstate{}=State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% GEN_SERVER %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 init([Module, Args, ConnSpecs]) ->
-  {ok,Pid} = qcache:start_link(),
+  {ok,Pid} = qcache:new(),
   Handles = lists:map(fun(Conn) -> connect(Conn) end, ConnSpecs),
   qcache:put_conns(Pid, Handles),
   random:seed(now()),
@@ -141,7 +145,7 @@ init([Module, Args, ConnSpecs]) ->
 %% Add an override for the encoding. All received messages will use this instead
 %% of what the message content-type specifies.
 init([Module, Args, ConnSpecs, Encoding]) ->
-  {ok,Pid} = qcache:start_link(),
+  {ok,Pid} = qcache:new(),
   Handles = lists:map(fun(Conn) -> connect(Conn) end, ConnSpecs),
   qcache:put_conns(Pid, Handles),
   random:seed(now()),
@@ -229,7 +233,7 @@ terminate(Reason, #gen_qstate{cache_pid=CachePid}=State) ->
     bunny_farm:close(?PV(handle,PList), ?PV(tag,PList))
   end,
   lists:map(Fn, Handles),
-  gen_server:cast(CachePid,stop),
+  qcache:delete(CachePid),
   ok.
 
 code_change(_OldVersion, State, _Extra) ->

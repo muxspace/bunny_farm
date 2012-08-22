@@ -38,7 +38,7 @@ handle_call({<<B/binary>>, Args}, From, State) ->
   handle_call(Args, From, State);
 
 handle_call(connection, From, State) ->
-  handle_call({connection, <<"qserver.two">>}, From, State);
+  handle_call({connection, {<<"qserver.two">>,<<"key">>}}, From, State);
 
 handle_call({connection,X}, _From, State) ->
   Conn = qcache:get_conn(State#state.cache_pid, X),

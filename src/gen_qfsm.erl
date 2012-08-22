@@ -123,7 +123,7 @@ connect(Exchange) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% GEN_SERVER %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 init([Module, Args, ConnSpecs]) ->
-  {ok,Pid} = qcache:start_link(),
+  {ok,Pid} = qcache:new(),
   Handles = lists:map(fun(Conn) -> connect(Conn) end, ConnSpecs),
   qcache:put_conns(Pid, Handles),
   random:seed(now()),

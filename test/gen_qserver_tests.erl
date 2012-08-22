@@ -171,6 +171,6 @@ conn_spec_override() ->
 get_connection() ->
   Conn = my_qserver:get_connection(),
   Handle = proplists:get_value(handle,Conn),
-  ?assertEqual(<<"qserver.two">>, proplists:get_value(id,Conn)),
+  ?assertEqual({<<"qserver.two">>,<<"key">>}, proplists:get_value(id,Conn)),
   ?assertEqual(bus_handle, element(1,Handle)).
 
