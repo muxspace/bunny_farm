@@ -27,7 +27,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PUBLIC %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 new() ->
-  Tid = ets:new(qcache_ets, [set, private, {keypos,2}]),
+  Tid = ets:new(qcache_ets, [set, {keypos,2}]),
   {ok,Tid}.
 
 get_bus(Tid, #qconn{id=Id}) ->
