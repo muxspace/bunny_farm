@@ -80,6 +80,7 @@ consume(#bus_handle{queue=Q,channel=Channel}, Options) when is_list(Options) ->
   AllOptions = [{queue,Q}, {no_ack,true}] ++ Options,
   BasicConsume = farm_tools:to_basic_consume(AllOptions),
   lager:debug("Sending subscription request:~n  ~p", [BasicConsume]),
+  %error_logger:info_msg("Sending subscription request:~n  ~p~n",[BasicConsume]),
   amqp_channel:subscribe(Channel, BasicConsume, self()).
 
 
@@ -136,6 +137,7 @@ respond(#message{payload=Payload, props=Props}, RoutingKey,
   AMsg = #amqp_msg{payload=farm_tools:encode_payload(MimeType,Payload),
                    props=farm_tools:to_amqp_props(Props)},
   BasicPublish = #'basic.publish'{exchange=X, routing_key=RoutingKey},
+  error_logger:info_msg("Responding to ~p~n", [BasicPublish]),
   amqp_channel:cast(Channel, BasicPublish, AMsg);
 
 respond(Payload, RoutingKey, #bus_handle{}=BusHandle) ->

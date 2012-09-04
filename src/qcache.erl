@@ -16,7 +16,7 @@
 -include("bunny_farm.hrl").
 -include("private_macros.hrl").
 -compile([{parse_transform,lager_transform}]).
--export([get_bus/2, get_conn/2,
+-export([get_bus/2, get_conn/2, get_conns/1,
          put_conn/2, put_conns/2,
          activate/2,
          connections/1,
@@ -29,6 +29,9 @@
 new() ->
   Tid = ets:new(qcache_ets, [set, {keypos,2}]),
   {ok,Tid}.
+
+get_bus(Tid, {id,Id}) ->
+  get_bus(Tid, Id);
 
 get_bus(Tid, #qconn{id=Id}) ->
   get_bus(Tid, Id);
@@ -60,6 +63,12 @@ get_conn(Tid, Id) ->
   case ets:lookup(Tid, Id) of
     [] -> not_found;
     [#qconn{}=Conn] -> to_proplist(Conn)
+  end.
+
+get_conns(Tid) ->
+  case ets:match(Tid, '$1') of
+    [] -> [];
+    Items when is_list(Items) -> [ to_proplist(V) || [V] <- Items ]
   end.
 
 put_conn(Tid, #qconn{}=Conn) ->

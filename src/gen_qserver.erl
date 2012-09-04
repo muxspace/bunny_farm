@@ -199,7 +199,8 @@ handle_info({#'basic.deliver'{routing_key=Key}, Content}, State) ->
         {reply,Response,NewState} ->
           {X,ReplyTo} = farm_tools:reply_to(Content),
           BusHandle = bus(CachePid, {id,X}),
-          lager:debug("Responding to ~p => ~p", [X,ReplyTo]),
+          %lager:debug("Responding to ~p => ~p", [X,ReplyTo]),
+          %error_logger:info_msg("Responding to ~p => ~p~n", [X,ReplyTo]),
           lager:debug("Response = ~p", [Response]),
           Props = [ {content_type, farm_tools:content_type(Content)},
                     {correlation_id, farm_tools:correlation_id(Content)} ],
