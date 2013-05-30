@@ -173,7 +173,7 @@ declare_queue(#bus_handle{}=BusHandle, Options) when is_list(Options) ->
   declare_queue(<<"">>, BusHandle, Options).
 
 declare_queue(Key, #bus_handle{channel=Channel}, Options) ->
-  AllOptions = lists:merge([{queue,Key}], Options),
+  AllOptions = lists:keymerge(1, lists:sort(Options), [{queue,Key}]),
   QueueDeclare = farm_tools:to_queue_declare(AllOptions),
   #'queue.declare_ok'{queue=Q} = amqp_channel:call(Channel, QueueDeclare),
   Q.
