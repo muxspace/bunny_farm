@@ -126,24 +126,8 @@ response({stop, Reason, Reply, ModState}, #gen_qstate{}=State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% GEN_SERVER %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 init([Module, Args, ConnSpecs]) ->
-  {ok,Pid} = qcache:new(),
-  Handles = lists:map(fun(Conn) -> connect(Conn) end, ConnSpecs),
-  qcache:put_conns(Pid, Handles),
-  random:seed(now()),
-  case Module:init(Args, Pid) of
-    {ok, ModuleState} ->
-      State = #gen_qstate{module=Module, module_state=ModuleState, cache_pid=Pid},
-      Response = {ok, State};
-    {ok, ModuleState, Timeout} ->
-      State = #gen_qstate{module=Module, module_state=ModuleState, cache_pid=Pid},
-      Response = {ok, State, Timeout};
-    {stop, Reason} ->
-      Response = {stop, Reason}
-  end,
-  Response;
+  init([Module, Args, ConnSpecs, undefined]);
 
-%% Add an override for the encoding. All received messages will use this instead
-%% of what the message content-type specifies.
 init([Module, Args, ConnSpecs, Encoding]) ->
   {ok,Pid} = qcache:new(),
   Handles = lists:map(fun(Conn) -> connect(Conn) end, ConnSpecs),
@@ -154,7 +138,7 @@ init([Module, Args, ConnSpecs, Encoding]) ->
       State = #gen_qstate{module=Module, module_state=ModuleState, cache_pid=Pid, encoding=Encoding},
       Response = {ok, State};
     {ok, ModuleState, Timeout} ->
-      State = #gen_qstate{module=Module, module_state=ModuleState, cache_pid=Pid},
+      State = #gen_qstate{module=Module, module_state=ModuleState, cache_pid=Pid, encoding=Encoding},
       Response = {ok, State, Timeout};
     {stop, Reason} ->
       Response = {stop, Reason}

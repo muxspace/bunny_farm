@@ -38,9 +38,10 @@ decode_properties(#amqp_msg{props=Properties}) ->
 
 decode_payload(#amqp_msg{payload=Payload}=Content) ->
   decode_payload(content_type(Content), Payload);
-
 decode_payload(Payload) -> decode_payload(bson, Payload).
 
+decode_payload(Encoding, #amqp_msg{payload=Payload}=_Content) ->
+  decode_payload(Encoding, Payload);
 decode_payload(none, Payload) -> Payload;
 decode_payload(<<"application/octet-stream">>, Payload) -> Payload;
 decode_payload({_E,M,F}, Payload) -> M:F(Payload);
